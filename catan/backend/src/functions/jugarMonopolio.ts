@@ -16,7 +16,7 @@ export function jugarMonopolio(
     if (!jugador.recursos.has(recurso)) {
         return {
             error: true,
-            mensaje: "El recurso no existe"
+            mensaje: "El recurso seleccionado no es válido"
         };
     }
 

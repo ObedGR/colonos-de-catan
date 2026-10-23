@@ -25,7 +25,7 @@ export function construirCamino(
     if(!arista){
         return {
             error: true,
-            mensaje: "El lugar seleccionado no es válido Papu"
+            mensaje: "El lugar seleccionado no es válido"
         };
     }
 
@@ -33,7 +33,7 @@ export function construirCamino(
     if(arista.propietario !== ""){
         return {
             error: true,
-            mensaje: "Ya hay algo acá"
+            mensaje: "Ese lugar ya está ocupado"
         };
     }
 
@@ -50,7 +50,7 @@ export function construirCamino(
         if(!comprobarCaminoPreconstruccion(h, d, p, jugador)){
             return {
                 error: true,
-                mensaje: "El camino debe conectar con el último asentamiento"
+                mensaje: "El camino debe conectar con tu último asentamiento"
             };
         }
     } else {
@@ -59,7 +59,7 @@ export function construirCamino(
             if(!comprobarMateriales(jugador, partida)){
                 return {
                     error: true,
-                    mensaje: "No tienes los recursos suficientes"
+                    mensaje: "No tienes los recursos suficientes para construir un camino"
                 }
             }
         }
@@ -67,7 +67,7 @@ export function construirCamino(
         if(!comprobarCaminoJuego(vertices, aristas, h, d, p, sessionId)){
             return {
                 error: true,
-                mensaje: "El camino debe conectar con alguna construccion tuya"
+                mensaje: "El camino debe conectar con una de tus construcciones o caminos"
             }
         }
         if(partida.faseJuego !== FaseJuego.CARRETERAS){

@@ -80,7 +80,7 @@ export class CatanRoom extends Room {
       //* Verificar que estemos en la fase de acciones
       if (this.partida.faseJuego !== FaseJuego.ACCIONES) {
         client.send("error", {
-          mensajeError: "Termian de lanzar los dados primero"
+          mensajeError: "Termina de lanzar los dados primero"
         })
         return;
       }
@@ -237,7 +237,7 @@ export class CatanRoom extends Room {
       //* Verificar que estemos en la fase de acciones
       if (this.partida.faseJuego !== FaseJuego.ACCIONES) {
         client.send("error", {
-          mensajeError: "Debes lanzar los dados primero"
+          mensajeError: "Termina de lanzar los dados primero"
         })
         return;
       }
@@ -403,7 +403,7 @@ export class CatanRoom extends Room {
         //* Comprobar que estamos en la fase de colocar asentamiento
         if (this.partida.fasePreconstruccion !== FasePreconstruccion.ASENTAMIENTO) {
           client.send("error", {
-            mensajeError: "Debes colocar un camino"
+            mensajeError: "Ahora debes colocar un camino"
           })
           return;
         }
@@ -448,7 +448,7 @@ export class CatanRoom extends Room {
         //* Comprobar que estamos en la fase de acciones
         if (this.partida.faseJuego !== FaseJuego.ACCIONES) {
           client.send("error", {
-            mensajeError: "Debes lanzar los dados primero"
+            mensajeError: "Termina de lanzar los dados primero"
           })
           return;
         }
@@ -519,7 +519,7 @@ export class CatanRoom extends Room {
         //* Comprobar que estemos en la fase de colocar camino
         if (this.partida.fasePreconstruccion !== FasePreconstruccion.CAMINO) {
           client.send("error", {
-            mensajeError: "Coloca primero un asentamiento"
+            mensajeError: "Primero debes colocar un asentamiento"
           })
           return;
         }
@@ -558,7 +558,7 @@ export class CatanRoom extends Room {
         //* Comprobar que estemos en la fase de acciones
         if (this.partida.faseJuego !== FaseJuego.ACCIONES) {
           client.send("error", {
-            mensajeError: "Debes lanzar los dados primero"
+            mensajeError: "Termina de lanzar los dados primero"
           })
           return;
         }
@@ -678,7 +678,7 @@ export class CatanRoom extends Room {
       //* Verificar que estemos en la fase de mover al ladron
       if (this.partida.faseJuego !== FaseJuego.LADRON) {
         client.send("error", {
-          mensajeError: "No es la fase de mover al ladron"
+          mensajeError: "No es la fase de mover al ladrón"
         })
         return;
       }
@@ -773,7 +773,7 @@ export class CatanRoom extends Room {
       //* Verificar que se permita usar carta
       if (!this.partida.cartaJugable) {
         client.send("error", {
-          mensajeError: "Solo una carta por turno"
+          mensajeError: "Solo puedes jugar una carta por turno"
         })
         return;
       }
@@ -890,7 +890,7 @@ export class CatanRoom extends Room {
         !jugador.recursos.has(mensaje.recursoRecibido)
       ) {
         client.send("error", {
-          mensajeError: "Los Recursos seleccionados no son validos"
+          mensajeError: "Los recursos seleccionados no son válidos"
         })
         return;
       }
@@ -898,7 +898,7 @@ export class CatanRoom extends Room {
       // * Verificar que las cantidades tengan sentido
       if (mensaje.cantidadEntregada <= 0 || mensaje.cantidadRecibida <= 0) {
         client.send("error", {
-          mensajeError: "No tienes suficientes recuros, mi loco"
+          mensajeError: "Las cantidades del intercambio deben ser mayores a cero"
         })
         return;
       }
@@ -941,7 +941,7 @@ export class CatanRoom extends Room {
       // * Verificar que no sea el jugador que la propuso
       if (!this.partida.ofertaIntercambio.respuestas.has(client.sessionId)) {
         client.send("error", {
-          mensajeError: "No puedes responde a esta oferta"
+          mensajeError: "No puedes responder a esta oferta"
         })
         return;
       }
@@ -957,7 +957,7 @@ export class CatanRoom extends Room {
       // * Verificar que sea una respueta valida
       if (mensaje.respuesta !== 1 && mensaje.respuesta !== -1) {
         client.send("error", {
-          mensajeError: "Respuesta invalida"
+          mensajeError: "Respuesta inválida"
         })
         return;
       }
@@ -995,7 +995,7 @@ export class CatanRoom extends Room {
           this.partida.ofertaIntercambio.limpiarOferta();
 
           client.send("error", {
-            mensajeError: "Oferta cancelada, el negociante no tiene ya recursos"
+            mensajeError: "Oferta cancelada: quien la propuso ya no tiene los recursos"
           })
 
           return;
@@ -1103,7 +1103,7 @@ export class CatanRoom extends Room {
       //* Verificar que se permita usar carta
       if(!this.partida.cartaJugable){
         client.send("error", {
-          mensajeError: "Solo una carta por turno"
+          mensajeError: "Solo puedes jugar una carta por turno"
         })
         return;
       }
@@ -1236,7 +1236,7 @@ export class CatanRoom extends Room {
       //* Verificar si se permite usar carta
       if (!this.partida.cartaJugable) {
         client.send("error", {
-          mensajeError: "solo una carta por turno"
+          mensajeError: "Solo puedes jugar una carta por turno"
         })
         return;
       }
@@ -1308,7 +1308,7 @@ export class CatanRoom extends Room {
       //* Verificar que se permite usar carta
       if (!this.partida.cartaJugable) {
         client.send("error", {
-          mensajeError: "Solo una carta por turno"
+          mensajeError: "Solo puedes jugar una carta por turno"
         });
         return;
       }
@@ -1382,7 +1382,7 @@ export class CatanRoom extends Room {
       //* Verificar que el jugador elegido este en la lista de robo
       if(!this.partida.jugadoresParaRobar.includes(mensaje.jugadorRobado)){
         client.send("error", {
-          mensajeError: "El jugador elegido no esta en la lista de robo"
+          mensajeError: "No puedes robarle a ese jugador"
         })
         return;
       }
@@ -1425,7 +1425,7 @@ export class CatanRoom extends Room {
     }
     if (this.codigoAcceso !== "") {
       if (options.codigoAcceso !== this.codigoAcceso) {
-        throw new Error("Codigo de acceso incorrecto");
+        throw new Error("Código de acceso incorrecto");
       }
     }
     console.log(`${client.sessionId} joined the room`);
@@ -1508,7 +1508,7 @@ export class CatanRoom extends Room {
     if(this.partida.fase !== FasePartida.LOBBY){
       this.broadcast("log", {
         jugador: this.jugadores.get(client.sessionId)?.nombre,
-        mensaje: " perdio la conexion, tiene 1 minuto para reconectarse"
+        mensaje: " perdió la conexión, tiene 30 segundos para reconectarse"
       })
     }
 

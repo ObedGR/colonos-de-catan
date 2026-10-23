@@ -16,7 +16,7 @@ export function verificarVictoria(
         //* Avisar a todos del ganador con el log
         room.broadcast("log", {
             jugador: "Sistema: ",
-            mensaje: `${jugador.nombre} HA GANADO LA PARTIDA!!`
+            mensaje: `¡${jugador.nombre} ha ganado la partida!`
         })
     }
     

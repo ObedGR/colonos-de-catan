@@ -13,7 +13,7 @@ export function descartarRecurso(
     if(!jugador.recursos.has(recurso)){
         return{
             error: true,
-            mensaje: "El recurso seleccionado no es valido"
+            mensaje: "El recurso seleccionado no es válido"
         };
     }
 
@@ -21,7 +21,7 @@ export function descartarRecurso(
     if(jugador.recursos.get(recurso) < 1){
         return {
             error: true,
-            mensaje: "Ese recurso no lo tiene"
+            mensaje: "No tienes ese recurso"
         };
     }
 
