@@ -27,7 +27,7 @@ export function construirAsentamiento(
     if(!vertice){
         return {
             error: true,
-            mensaje: "El lugar seleccionado, no es valido!"
+            mensaje: "El lugar seleccionado no es válido"
         }
     }
 
@@ -35,7 +35,7 @@ export function construirAsentamiento(
     if(vertice.propietario !== ""){
         return {
             error: true,
-            mensaje: "Ya hay algo utilizando este espacio!"
+            mensaje: "Ese lugar ya está ocupado"
         }
     }
 
@@ -45,7 +45,7 @@ export function construirAsentamiento(
     ){
         return {
             error:true,
-            mensaje: "No tienes los recursos necesarios"
+            mensaje: "No tienes los recursos suficientes para construir un asentamiento"
         };
     }
 

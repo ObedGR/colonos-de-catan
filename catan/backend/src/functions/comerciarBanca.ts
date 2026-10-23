@@ -26,7 +26,7 @@ export function comerciarBanca(
     ){
         return{
             error: true,
-            mensaje: "Los recursos seleccionados no son validos"
+            mensaje: "Los recursos seleccionados no son válidos"
         }
     }
 
@@ -79,7 +79,7 @@ export function comerciarBanca(
 
     return{
         error: false,
-        mensaje: " ha realizado un intecambio con la banca"
+        mensaje: " ha realizado un intercambio con la banca"
     }
 }
 

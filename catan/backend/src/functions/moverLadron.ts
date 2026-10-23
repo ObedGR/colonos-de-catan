@@ -19,7 +19,7 @@ export function moverLadron(
     if(!hexagono){
         return {
             error: true,
-            mensaje: "El hexagono seleccionado no existe",
+            mensaje: "El hexágono seleccionado no existe",
             jugadoresInvolucrados: []
         };
     }
@@ -28,7 +28,7 @@ export function moverLadron(
     if(tablero.ladron.h === h && tablero.ladron.d === d){
         return {
             error: true,
-            mensaje: "El ladron ya esta en ese hexagono",
+            mensaje: "El ladrón ya está en ese hexágono",
             jugadoresInvolucrados: []
         };
     }
@@ -67,7 +67,7 @@ export function moverLadron(
 
     return {
         error: false,
-        mensaje: " ha movido al ladron",
+        mensaje: " ha movido al ladrón",
         jugadoresInvolucrados: jugadoresInvolucrados
     }
 }
