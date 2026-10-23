@@ -18,6 +18,7 @@ export class Partida extends Schema {
   @type("string") ejercitoMasGrande: string;
   @type("uint8") carreterasGratis: number;
   @type(OfertaIntercambio) ofertaIntercambio = new OfertaIntercambio();
+  @type("string") caminoMasLargo: string;
 
   constructor() {
     super();
@@ -32,5 +33,6 @@ export class Partida extends Schema {
     this.ganador = "";
     this.ejercitoMasGrande = "";
     this.carreterasGratis = 0;
+    this.caminoMasLargo = "";
   }
 }
