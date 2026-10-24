@@ -35,7 +35,7 @@ export function jugarCaballero(
         //* Avisar que el jugador ha obtenido el ejercito mas grande
         room.broadcast("log", {
             jugador: jugador.nombre,
-            mensaje: " ha obtenido el ejercito mas grande"
+            mensaje: " ha obtenido el ejército más grande"
         })
         return;
     }
@@ -56,7 +56,7 @@ export function jugarCaballero(
         //* Avisar que el jugador ha quitado el ejercito mas grande a otro jugador
         room.broadcast("log", {
             jugador: jugador.nombre,
-            mensaje: " ha quitado el ejercito mas grande a " + jugadorMayorEjercito.nombre
+            mensaje: " le ha quitado el ejército más grande a " + jugadorMayorEjercito.nombre
         })
     }
 

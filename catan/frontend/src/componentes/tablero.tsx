@@ -1,5 +1,6 @@
 import type { ObjetivoConstruccion, TipoConstruccion } from './construir';
 import type { Coordenada, DatosTablero } from '../common/tablero';
+import type { LugaresConstruccion } from '../common/construccion';
 import { NOMBRE_PUERTO } from '../common/tablero';
 import { colorDeJugador } from '../common/jugador';
 import "./tablero.css"
@@ -77,8 +78,7 @@ interface Props {
   datos: DatosTablero;
   // Para pintar cada pieza del color de su dueño.
   ordenJugadores?: string[];
-  // Solo para resaltar los poblados de el jugador para costruir la Ciudad
-  miSessionId?: string;
+  lugaresValidos: LugaresConstruccion;
   tipoConstruccion?: TipoConstruccion | null;
   objetivoSeleccionado?: ObjetivoConstruccion | null;
   onSeleccionarObjetivo?: (objetivo: ObjetivoConstruccion) => void;
@@ -99,7 +99,7 @@ function esElObjetivo(
 function Tablero({
   datos,
   ordenJugadores = [],
-  miSessionId = '',
+  lugaresValidos,
   tipoConstruccion = null,
   objetivoSeleccionado,
   onSeleccionarObjetivo,
@@ -157,7 +157,7 @@ function Tablero({
       })}
       {Object.entries(datos.aristas).map(([clave, arista]) => {
         const [a, b] = segmentoArista(arista.h, arista.d, arista.p);
-        const puedeSeleccionar = tipoConstruccion === 'camino' && arista.propietario === '';
+        const puedeSeleccionar = tipoConstruccion === 'camino' && lugaresValidos.camino.has(clave);
         const seleccionado = puedeSeleccionar && esElObjetivo(objetivoSeleccionado, arista.h, arista.d, arista.p);
         const objetivo = { h: arista.h, d: arista.d, p: arista.p };
         return (
@@ -236,11 +236,8 @@ function Tablero({
 
       {Object.entries(datos.vertices).map(([clave, vertice]) => {
         const [x, y] = puntoVertice(vertice.h, vertice.d, vertice.p);
-        const puedeSeleccionar =
-          (tipoConstruccion === 'poblado' && vertice.constuccion === 0) ||
-          (tipoConstruccion === 'ciudad'
-            && vertice.constuccion === 1
-            && vertice.propietario === miSessionId);
+        const puedeSeleccionar = (tipoConstruccion === 'poblado' || tipoConstruccion === 'ciudad')
+          && lugaresValidos[tipoConstruccion].has(clave);
         const seleccionado = puedeSeleccionar && esElObjetivo(objetivoSeleccionado, vertice.h, vertice.d, vertice.p);
         const objetivo = { h: vertice.h, d: vertice.d, p: vertice.p };
         // El circulo sigue siendo el area de clic; la pieza se dibuja encima.

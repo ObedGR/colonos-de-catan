@@ -25,6 +25,7 @@ import Construir, {
   type SolicitudConstruccion,
   type TipoConstruccion,
 } from '../componentes/construir';
+import { lugaresValidosConstruccion, motivoConstruccionNoDisponible } from '../common/construccion';
 import { FASE_JUEGO, FASE_PARTIDA, FASE_PRECONSTRUCCION } from '../common/fases';
 import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
@@ -459,6 +460,15 @@ function Partida({ sala, onSolicitarConstruccion, onSalir }: Props) {
         : 'poblado';
 
   const puedeConstruir = enPreconstruccion || puedePasarTurno || colocandoCaminosGratis;
+  const recursosConstruccion = jugadores[miSessionId]?.recursos ?? recursosPrueba;
+  const lugaresValidos = lugaresValidosConstruccion(
+    datosTablero, miSessionId, enPreconstruccion,
+    jugadores[miSessionId]?.ultimoAsentamiento ?? '',
+  );
+  const tipoConstruccionActivo = tipoConstruccion
+    && !motivoConstruccionNoDisponible(
+      tipoConstruccion, recursosConstruccion, puedeConstruir, tipoPermitido, lugaresValidos,
+    ) ? tipoConstruccion : null;
 
   function pasarTurno() {
     if (!sala || !puedePasarTurno || pasandoTurno) return;
@@ -595,12 +605,13 @@ function Partida({ sala, onSolicitarConstruccion, onSalir }: Props) {
   }
 
   function seleccionarObjetivo(objetivo: ObjetivoConstruccion) {
-    if (!tipoConstruccion) return;
+    if (!tipoConstruccionActivo || caminoGratisEnEspera !== null) return;
+    if (!lugaresValidos[tipoConstruccionActivo].has(`${objetivo.h},${objetivo.d},${objetivo.p}`)) return;
 
     /* Camino gratis: misma eleccion de arista, pero con msgCaminoGratis y el
        mismo JSON { h, d, p }. El modo camino sigue activo para el siguiente;
        el backend vuelve a ACCIONES al terminar los caminos gratis. */
-    if (sala && colocandoCaminosGratis && tipoConstruccion === 'camino') {
+    if (sala && colocandoCaminosGratis && tipoConstruccionActivo === 'camino') {
       if (caminoGratisEnEspera !== null) return;
       setObjetivoConstruccion(objetivo);
       setCaminoGratisEnEspera(partidaActual?.carreterasGratis ?? 0);
@@ -613,21 +624,21 @@ function Partida({ sala, onSolicitarConstruccion, onSalir }: Props) {
 
     // El backend valida turno, fase, recursos y posicion, y confirma por el
     // estado: no manda ningun mensaje de exito.
-    const mensaje = MENSAJE_CONSTRUIR[tipoConstruccion];
+    const mensaje = MENSAJE_CONSTRUIR[tipoConstruccionActivo];
     if (sala && mensaje) {
       sala.send(mensaje, objetivo);
       setTipoConstruccion(null);
-      setEstadoConstruccion(`Enviado al servidor: ${tipoConstruccion}.`);
+      setEstadoConstruccion(`Enviado al servidor: ${tipoConstruccionActivo}.`);
       return;
     }
 
-    const solicitud: SolicitudConstruccion = { tipo: tipoConstruccion, objetivo };
+    const solicitud: SolicitudConstruccion = { tipo: tipoConstruccionActivo, objetivo };
 
     // La validación definitiva (turno, recursos, legalidad y propiedad) vive
     // en CatanRoom. Este callback será conectado por la issue de integración.
     onSolicitarConstruccion?.(solicitud);
     setEstadoConstruccion(
-      `Solicitud de ${tipoConstruccion} preparada para (${objetivo.h}, ${objetivo.d}, ${objetivo.p}).`,
+      `Solicitud de ${tipoConstruccionActivo} preparada para (${objetivo.h}, ${objetivo.d}, ${objetivo.p}).`,
     );
   }
 
@@ -647,9 +658,10 @@ function Partida({ sala, onSolicitarConstruccion, onSalir }: Props) {
         </div>
         <div className="construir">
           <Construir
-            recursos={jugadores[miSessionId]?.recursos ?? recursosPrueba}
+            recursos={recursosConstruccion}
             esMiTurno={esMiTurno}
             puedeConstruir={puedeConstruir}
+            lugaresValidos={lugaresValidos}
             tipoPermitido={tipoPermitido}
             seleccion={tipoConstruccion}
             onSeleccionar={seleccionarConstruccion}
@@ -665,6 +677,8 @@ function Partida({ sala, onSolicitarConstruccion, onSalir }: Props) {
             jugadores={jugadores}
             ordenJugadores={ordenJugadores}
             miSessionId={miSessionId}
+            caminoMasLargo={partidaActual?.caminoMasLargo}
+            ejercitoMasGrande={partidaActual?.ejercitoMasGrande}
           />
         </div>
         <div className="tablero" style={{ position: 'relative' }}>
@@ -706,10 +720,10 @@ function Partida({ sala, onSolicitarConstruccion, onSalir }: Props) {
           <Tablero
             datos={datosTablero}
             ordenJugadores={ordenJugadores}
-            miSessionId={miSessionId}
             // Mientras se envia un camino gratis se ocultan las aristas: evita
             // mandar dos y gastar los dos caminos con un doble clic.
-            tipoConstruccion={caminoGratisEnEspera !== null ? null : tipoConstruccion}
+            tipoConstruccion={caminoGratisEnEspera !== null ? null : tipoConstruccionActivo}
+            lugaresValidos={lugaresValidos}
             objetivoSeleccionado={objetivoConstruccion}
             onSeleccionarObjetivo={seleccionarObjetivo}
             moviendoLadron={(puedeMoverLadron && !moviendoLadron) || caballero === 'eligiendo'}

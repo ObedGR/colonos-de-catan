@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Room } from "@colyseus/sdk";
+import Avisos, { type Aviso, type TipoAviso } from "./componentes/Avisos";
 import { client } from "./pantallas/colyseusClient";
 import Home from "./pantallas/Home/Home";
 import ElegirModo from "./pantallas/ElegirModo/ElegirModo";
@@ -82,6 +83,18 @@ function Navegacion() {
   const [origenCrear, setOrigenCrear] = useState<"elegir" | "lobby">("elegir");
   // Distingue "Salir" (voluntario) de una caída que no se pudo recuperar.
   const salidaVoluntaria = useRef(false);
+  // Cola de avisos flotantes (errores del servidor, etc.).
+  const [avisos, setAvisos] = useState<Aviso[]>([]);
+  const siguienteIdAviso = useRef(0);
+
+  function mostrarAviso(tipo: TipoAviso, mensaje: string) {
+    const id = siguienteIdAviso.current++;
+    setAvisos((anteriores) => [...anteriores, { id, tipo, mensaje }]);
+  }
+
+  function quitarAviso(id: number) {
+    setAvisos((anteriores) => anteriores.filter((aviso) => aviso.id !== id));
+  }
 
   // La partida empieza cuando el backend deja de estar en LOBBY (lo cambia
   // msgIniciarPartida), así todos los clientes avanzan a la vez.
@@ -163,7 +176,7 @@ function Navegacion() {
     }
 
     function alRecibirError(err: { mensajeError: string }) {
-      alert(err.mensajeError);
+      mostrarAviso("error", err.mensajeError);
     }
 
     sincronizarEstado(salaActual.state as unknown as EstadoDeSala);
@@ -237,70 +250,81 @@ function Navegacion() {
     setVista("crear");
   }
 
-  if (!room) {
-    if (vista === "reconectando") {
-      return <Reconectando />;
-    }
+  // Pantalla que corresponde según la sala y la vista elegida.
+  function pantallaActual(): ReactNode {
+    if (!room) {
+      if (vista === "reconectando") {
+        return <Reconectando />;
+      }
 
-    if (vista === "inicio") {
-      return <Home onAbrirMenu={() => setVista(nombreJugador ? "elegir" : "nombre")} />;
-    }
+      if (vista === "inicio") {
+        return <Home onAbrirMenu={() => setVista(nombreJugador ? "elegir" : "nombre")} />;
+      }
 
-    if (vista === "nombre") {
+      if (vista === "nombre") {
+        return (
+          <IngresarNombre
+            nombreInicial={nombreJugador}
+            onConfirmar={(nombre) => {
+              guardarNombreJugador(nombre);
+              setNombreJugador(nombre);
+              setVista("elegir");
+            }}
+            onVolver={() => setVista("inicio")}
+          />
+        );
+      }
+
+      if (vista === "elegir") {
+        return (
+          <ElegirModo
+            nombreJugador={nombreJugador}
+            onCrear={() => abrirCrearSala("elegir")}
+            onUnirse={() => setVista("lobby")}
+            onVolver={() => setVista("inicio")}
+            onCambiarNombre={() => setVista("nombre")}
+          />
+        );
+      }
+
+      if (vista === "crear") {
+        return <CrearSala nombreJugador={nombreJugador} onCrear={crearSala} onVolver={() => setVista(origenCrear)} />;
+      }
+
       return (
-        <IngresarNombre
-          nombreInicial={nombreJugador}
-          onConfirmar={(nombre) => {
-            guardarNombreJugador(nombre);
-            setNombreJugador(nombre);
-            setVista("elegir");
-          }}
-          onVolver={() => setVista("inicio")}
+        <Lobby
+          onCrearSala={() => abrirCrearSala("lobby")}
+          onUnirseASala={unirseASala}
+          onVolver={() => setVista("elegir")}
         />
       );
     }
 
-    if (vista === "elegir") {
+    if (!partidaIniciada) {
       return (
-        <ElegirModo
-          nombreJugador={nombreJugador}
-          onCrear={() => abrirCrearSala("elegir")}
-          onUnirse={() => setVista("lobby")}
-          onVolver={() => setVista("inicio")}
-          onCambiarNombre={() => setVista("nombre")}
+        <SalaEspera
+          room={room}
+          infoSala={infoSala}
+          jugadores={jugadores}
+          maxJugadores={MAX_JUGADORES}
+          minJugadores={MIN_JUGADORES}
+          esCreador={esCreador}
+          onIniciarPartida={() => room.send("msgIniciarPartida")}
+          onSalir={salirDeSala}
         />
       );
     }
 
-    if (vista === "crear") {
-      return <CrearSala nombreJugador={nombreJugador} onCrear={crearSala} onVolver={() => setVista(origenCrear)} />;
-    }
-
-    return (
-      <Lobby
-        onCrearSala={() => abrirCrearSala("lobby")}
-        onUnirseASala={unirseASala}
-        onVolver={() => setVista("elegir")}
-      />
-    );
+    return <PartidaTablero sala={room} onSalir={salirDeSala} />;
   }
 
-  if (!partidaIniciada) {
-    return (
-      <SalaEspera
-        room={room}
-        infoSala={infoSala}
-        jugadores={jugadores}
-        maxJugadores={MAX_JUGADORES}
-        minJugadores={MIN_JUGADORES}
-        esCreador={esCreador}
-        onIniciarPartida={() => room.send("msgIniciarPartida")}
-        onSalir={salirDeSala}
-      />
-    );
-  }
-
-  return <PartidaTablero sala={room} onSalir={salirDeSala} />;
+  return (
+    <>
+      {pantallaActual()}
+      {/* Fuera de cada pantalla para que los avisos se vean en todas. */}
+      <Avisos avisos={avisos} onQuitar={quitarAviso} />
+    </>
+  );
 }
 
 export default Navegacion;

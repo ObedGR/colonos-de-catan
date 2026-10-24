@@ -21,7 +21,7 @@ export function construirCiudad(
     if(!vertice){
         return{
             error: true,
-            mensaje: "El lugar seleccionado no es valido"
+            mensaje: "El lugar seleccionado no es válido"
         };
     }
 
@@ -53,7 +53,7 @@ export function construirCiudad(
     if(!comprobarRecursos(jugador)){
         return{
             error: true,
-            mensaje: "No tienes recursos para construir una ciduad"
+            mensaje: "No tienes los recursos suficientes para construir una ciudad"
         };
     }
 

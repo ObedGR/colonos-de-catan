@@ -1,4 +1,6 @@
 import type { Recursos } from '../common/jugador';
+import type { LugaresConstruccion } from '../common/construccion';
+import { motivoConstruccionNoDisponible } from '../common/construccion';
 import './construir.css';
 
 // Estos nombres se envían al backend. No usamos las etiquetas visibles para
@@ -20,34 +22,25 @@ interface OpcionConstruccion {
   tipo: TipoConstruccion;
   etiqueta: string;
   ayuda: string;
-  costo: Partial<Recursos>;
 }
 
 const OPCIONES: OpcionConstruccion[] = [
-  { tipo: 'camino', etiqueta: 'Camino', ayuda: 'Selecciona una arista del tablero', costo: { madera: 1, ladrillo: 1 } },
-  { tipo: 'poblado', etiqueta: 'Poblado', ayuda: 'Selecciona un vértice vacío del tablero', costo: { madera: 1, ladrillo: 1, lana: 1, trigo: 1 } },
-  { tipo: 'ciudad', etiqueta: 'Ciudad', ayuda: 'Selecciona uno de tus poblados', costo: { trigo: 2, mineral: 3 } },
+  { tipo: 'camino', etiqueta: 'Camino', ayuda: 'Selecciona un camino resaltado del tablero' },
+  { tipo: 'poblado', etiqueta: 'Poblado', ayuda: 'Selecciona un vértice resaltado del tablero' },
+  { tipo: 'ciudad', etiqueta: 'Ciudad', ayuda: 'Selecciona uno de tus poblados' },
 ];
 
 interface Props {
   recursos: Recursos;
   esMiTurno: boolean;
   puedeConstruir: boolean;
+  lugaresValidos: LugaresConstruccion;
   tipoPermitido?: TipoConstruccion | null;
   seleccion: TipoConstruccion | null;
   onSeleccionar: (tipo: TipoConstruccion | null) => void;
 }
 
-// El botón se desactiva antes de seleccionar, pero el servidor vuelve a
-// comprobar los recursos para evitar que el cliente pueda falsificarlos.
-function puedePagar(recursos: Recursos, costo: Partial<Recursos>) {
-  return Object.entries(costo).every(([recurso, cantidad]) => {
-    const clave = recurso as keyof Recursos;
-    return recursos[clave] >= cantidad;
-  });
-}
-
-function Construir({ recursos, esMiTurno, puedeConstruir, tipoPermitido = null, seleccion, onSeleccionar }: Props) {
+function Construir({ recursos, esMiTurno, puedeConstruir, lugaresValidos, tipoPermitido = null, seleccion, onSeleccionar }: Props) {
   return (
     <section className="cnMarco" aria-labelledby="construir-titulo">
       <div className="cnCabecera">
@@ -57,10 +50,11 @@ function Construir({ recursos, esMiTurno, puedeConstruir, tipoPermitido = null, 
 
       <div className="cnRejilla">
         {OPCIONES.map((opcion) => {
-        const habilitada = puedeConstruir && (tipoPermitido
-            ? opcion.tipo === tipoPermitido
-            : puedePagar(recursos, opcion.costo));
-          const activa = seleccion === opcion.tipo;
+          const motivo = motivoConstruccionNoDisponible(
+            opcion.tipo, recursos, puedeConstruir, tipoPermitido, lugaresValidos,
+          );
+          const habilitada = motivo === null;
+          const activa = habilitada && seleccion === opcion.tipo;
 
           return (
             <button
@@ -74,15 +68,14 @@ function Construir({ recursos, esMiTurno, puedeConstruir, tipoPermitido = null, 
               <span className={`cnIcono cnIcono-${opcion.tipo}`} aria-hidden="true" />
               <span className="cnNombre">{opcion.etiqueta}</span>
               <span className="cnAyuda">
-                {habilitada ? opcion.ayuda
-                  : puedeConstruir && !tipoPermitido ? 'Recursos insuficientes' : 'No disponible ahora'}
+                {motivo ?? opcion.ayuda}
               </span>
             </button>
           );
         })}
       </div>
 
-      {seleccion && (
+      {seleccion && !motivoConstruccionNoDisponible(seleccion, recursos, puedeConstruir, tipoPermitido, lugaresValidos) && (
         <p className="cnInstruccion" role="status">
           Seleccionaste <b>{OPCIONES.find((opcion) => opcion.tipo === seleccion)?.etiqueta}</b>.
           Ahora elige el lugar en el tablero.
