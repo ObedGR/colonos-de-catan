@@ -25,6 +25,7 @@ import { jugarMonopolio } from "../functions/jugarMonopolio.js";
 import { siguienteTurnoPreconstruccion } from "../functions/siguienteTurnoPreconstruccion.js";
 import { comprarCarta } from "../functions/comprarCarta.js";
 import { sacarJugador } from "../functions/sacarJugador.js";
+import { actualizarCaminoMasLargo } from "../functions/caminoMasLargo.js";
 
 
 export class CatanRoom extends Room {
@@ -371,6 +372,13 @@ export class CatanRoom extends Room {
 
       siguienteTurno(this.partida);
 
+      //* Quien recibe el turno pudo llegar a la meta durante el turno de otro
+      //* (por ejemplo, si le cortaron la ruta a otro y gano el camino mas largo)
+      const siguiente = this.jugadores.get(this.partida.turnoActual);
+      if (siguiente) {
+        verificarVictoria(this.partida, siguiente, this.partida.turnoActual, this);
+      }
+
     },
 
     msgColocarAsentamiento: (
@@ -480,6 +488,9 @@ export class CatanRoom extends Room {
           })
         }
 
+        //* Un asentamiento puede cortar la ruta de otro jugador
+        this.revisarCaminoMasLargo();
+
         //* Verificar si el jugador ha ganado
         verificarVictoria(this.partida, jugador, client.sessionId, this);
       }
@@ -584,6 +595,10 @@ export class CatanRoom extends Room {
             mensaje: resultado.mensaje
           })
         }
+
+        //* El camino nuevo puede darle el camino mas largo
+        this.revisarCaminoMasLargo();
+        verificarVictoria(this.partida, jugador, client.sessionId, this);
       }
     },
 
@@ -1195,6 +1210,12 @@ export class CatanRoom extends Room {
         return;
       }
 
+      //* El camino gratis tambien cuenta para el camino mas largo
+      if (!resultado.error) {
+        this.revisarCaminoMasLargo();
+        verificarVictoria(this.partida, jugador, client.sessionId, this);
+      }
+
       // * Reducir la cantidad de caminos gratis restantes
       this.partida.carreterasGratis -= 1;
 
@@ -1404,6 +1425,30 @@ export class CatanRoom extends Room {
     
   };
 
+  //* Recalcula el camino mas largo y avisa en el log si cambio de dueño
+  revisarCaminoMasLargo() {
+    const { anterior, nuevo } = actualizarCaminoMasLargo(
+      this.partida, this.jugadores, this.tablero.vertices, this.tablero.aristas
+    );
+    if (anterior === nuevo) return;
+
+    if (nuevo === "") {
+      this.broadcast("log", {
+        jugador: "Sistema: ",
+        mensaje: "El camino más largo ha quedado libre"
+      });
+      return;
+    }
+
+    const nombreAnterior = this.jugadores.get(anterior)?.nombre;
+    this.broadcast("log", {
+      jugador: this.jugadores.get(nuevo)?.nombre,
+      mensaje: nombreAnterior
+        ? ` le ha quitado el camino más largo a ${nombreAnterior}`
+        : " ha obtenido el camino más largo"
+    });
+  }
+
   onCreate(options: any) {
     console.log("room created!", this.roomId);
     //* si se ingresa codigo de acceso, se setea al atributo de codigo de acceso a la sala
@@ -1477,6 +1522,11 @@ export class CatanRoom extends Room {
       })
 
       sacarJugador(this.partida, this.tablero, this.banca, this.jugadores, client.sessionId);
+
+      //* Sus caminos y construcciones desaparecen, el titulo puede cambiar
+      if (this.partida.fase === FasePartida.JUEGO) {
+        this.revisarCaminoMasLargo();
+      }
 
       //* Actualizar el creador si era el que abandono
       if(eraCreador){

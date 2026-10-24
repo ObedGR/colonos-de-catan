@@ -84,6 +84,8 @@ export interface Jugador {
   ultimoAsentamiento: string;
   // Caballeros que ya jugo. Decide quien tiene el ejercito mas grande.
   caballerosJugados: number;
+  // Largo de su ruta continua mas larga. Decide quien tiene el camino mas largo.
+  largoCamino: number;
 }
 
 /* Aqui SI va un Record de clave suelta, porque las claves son sessionId que no

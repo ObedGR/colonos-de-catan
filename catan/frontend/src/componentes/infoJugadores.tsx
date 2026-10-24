@@ -5,9 +5,12 @@ interface Props {
   jugadores: Jugadores;
   ordenJugadores: string[];
   miSessionId: string;
+  // sessionId de quien tiene cada titulo (vacio si nadie).
+  caminoMasLargo?: string;
+  ejercitoMasGrande?: string;
 }
 
-function InfoJugadores({ jugadores, ordenJugadores, miSessionId }: Props) {
+function InfoJugadores({ jugadores, ordenJugadores, miSessionId, caminoMasLargo = '', ejercitoMasGrande = '' }: Props) {
   const lista = ordenJugadores.length ? ordenJugadores : Object.keys(jugadores);
 
   return (
@@ -28,6 +31,16 @@ function InfoJugadores({ jugadores, ordenJugadores, miSessionId }: Props) {
               <span className="flex-grow-1 text-truncate text-white fw-semibold">
                 {yo && '(Yo) '}{j.nombre}
               </span>
+              {id === caminoMasLargo && (
+                <span className="badge bg-light text-dark flex-shrink-0" title="Camino más largo (+2 puntos)">
+                  🛣️ +2
+                </span>
+              )}
+              {id === ejercitoMasGrande && (
+                <span className="badge bg-light text-dark flex-shrink-0" title="Ejército más grande (+2 puntos)">
+                  ⚔️ +2
+                </span>
+              )}
               <span className="fw-bold flex-shrink-0 text-white">{j.puntuacion}/10</span>
             </div>
             <div className="d-flex justify-content-between text-white">
@@ -36,6 +49,9 @@ function InfoJugadores({ jugadores, ordenJugadores, miSessionId }: Props) {
               </span>
               <span title="Caballeros jugados. Decide el ejercito mas grande">
                 {j.caballerosJugados} caballeros
+              </span>
+              <span title="Caminos seguidos en su ruta más larga. Con 5 o más se gana el camino más largo">
+                {j.largoCamino} ruta
               </span>
               <span
                 title="Cartas de recurso en la mano"
