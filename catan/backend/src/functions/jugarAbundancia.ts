@@ -12,7 +12,7 @@ export function jugarAbundancia(
     mensaje: string
 }{
     //* Verificar que los recursos existan
-    if(!banca.recursos.has(recurso1) && !banca.recursos.has(recurso2)){
+    if(!banca.recursos.has(recurso1) || !banca.recursos.has(recurso2)){
         return {
             error: true,
             mensaje: "Los recursos seleccionados no son válidos"
