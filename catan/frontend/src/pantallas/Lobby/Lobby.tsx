@@ -17,6 +17,11 @@ import type { Theme } from "@mui/material/styles";
 import Typography from "@mui/material/Typography";
 import { client } from "../colyseusClient";
 import type { InfoSala } from "../sesionGuardada";
+import {
+  configuracionDesde,
+  resumenConfiguracion,
+  type ConfiguracionPartida,
+} from "../../common/configuracion";
 import { ERROR_CODIGO_INCORRECTO, LARGO_MAXIMO_CODIGO, validarCodigoAcceso } from "../validacionSala";
 
 export type SalaTipo = "publica" | "privada";
@@ -28,10 +33,11 @@ export interface SalaDisponible {
   jugadores: number;
   maxJugadores: number;
   anfitrion: string;
+  configuracion: ConfiguracionPartida;
 }
 
 // Metadata que CatanRoom publica con setMetadata (ver onCreate en el backend).
-interface MetadataSala {
+interface MetadataSala extends Partial<ConfiguracionPartida> {
   alias?: string;
   estado?: string;
   privada?: boolean;
@@ -54,6 +60,7 @@ function salaDesdeListado(sala: RoomAvailable<MetadataSala>): SalaDisponible {
     jugadores: sala.clients,
     maxJugadores: sala.maxClients,
     anfitrion: sala.metadata?.anfitrion || "",
+    configuracion: configuracionDesde(sala.metadata),
   };
 }
 
@@ -317,6 +324,9 @@ function Lobby({ onCrearSala, onUnirseASala, onVolver }: LobbyProps) {
                         </div>
                         <small className="text-body-secondary">
                           {sala.anfitrion ? `Anfitrión: ${sala.anfitrion}` : "Sin anfitrión"}
+                        </small>
+                        <small className="text-body-secondary text-wrap" aria-label="Reglas de la partida">
+                          {resumenConfiguracion(sala.configuracion).join(" · ")}
                         </small>
                         <div
                           className="d-flex align-items-center gap-2"

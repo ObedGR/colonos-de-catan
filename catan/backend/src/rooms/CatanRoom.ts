@@ -26,6 +26,11 @@ import { siguienteTurnoPreconstruccion } from "../functions/siguienteTurnoPrecon
 import { comprarCarta } from "../functions/comprarCarta.js";
 import { sacarJugador } from "../functions/sacarJugador.js";
 import { actualizarCaminoMasLargo } from "../functions/caminoMasLargo.js";
+import {
+  INTERVALO_TEMPORIZADOR, alAzar, cartaAlAzar, claveFase, clienteSimulado
+} from "../functions/temporizador.js";
+import { leerConfiguracion } from "../common/configuracion.js";
+import { generarTableroPrincipiante } from "../generators/generarTableroPrincipiante.js";
 
 
 export class CatanRoom extends Room {
@@ -37,6 +42,10 @@ export class CatanRoom extends Room {
   jugadores = this.state.jugadores;
   ofertas = new Map<string, unknown>();
   codigoAcceso = "";
+
+  //* Temporizador de turno: fase que se esta cronometrando y cuando vence (ms)
+  faseCronometrada = "";
+  venceFase = 0;
 
 
   messages = {
@@ -873,6 +882,14 @@ export class CatanRoom extends Room {
         cantidadRecibida: number,
       }
     ) => {
+      //* Verificar que la sala permita comerciar entre jugadores
+      if (!this.partida.comercioJugadores) {
+        client.send("error", {
+          mensajeError: "El comercio entre jugadores está desactivado en esta partida"
+        })
+        return;
+      }
+
       //* Verificar que sea el turno del jugador
       if (this.partida.turnoActual !== client.sessionId) {
         client.send("error", {
@@ -1449,17 +1466,192 @@ export class CatanRoom extends Room {
     });
   }
 
+  //* Lleva la cuenta regresiva de la fase en curso y la resuelve si se acaba el tiempo
+  revisarTemporizador() {
+    //* Solo hay temporizador durante la colocacion inicial y el juego, y si la sala tiene limite
+    const enJuego = this.partida.fase === FasePartida.PRECONSTRUCCION || this.partida.fase === FasePartida.JUEGO;
+    if (!enJuego || this.partida.duracionTurno === 0) {
+      this.faseCronometrada = "";
+      this.partida.tiempoRestante = 0;
+      return;
+    }
+
+    const ahora = Date.now();
+    const clave = claveFase(this.partida);
+
+    //* Fase o turno nuevo: el tiempo vuelve a empezar
+    if (clave !== this.faseCronometrada) {
+      this.faseCronometrada = clave;
+      this.venceFase = ahora + this.partida.duracionTurno * 1000;
+    }
+
+    const restante = Math.max(0, Math.ceil((this.venceFase - ahora) / 1000));
+    if (this.partida.tiempoRestante !== restante) {
+      this.partida.tiempoRestante = restante;
+    }
+    if (restante > 0) return;
+
+    try {
+      this.resolverTiempoAgotado();
+    } catch (error) {
+      console.error("Error al resolver el tiempo agotado:", error);
+    }
+
+    //* Si por algun motivo la fase no avanzo, se da otro plazo en vez de reintentar sin parar
+    if (claveFase(this.partida) === clave) {
+      this.faseCronometrada = "";
+    }
+  }
+
+  //* Hace por el jugador lo que tenia pendiente, con las mismas reglas que si lo hiciera el
+  resolverTiempoAgotado() {
+    const sessionId = this.partida.turnoActual;
+    const cliente = clienteSimulado(sessionId);
+    const nombre = this.jugadores.get(sessionId)?.nombre ?? "un jugador";
+    const avisar = (accion: string) => this.broadcast("log", {
+      jugador: "Sistema: ",
+      mensaje: `Se acabó el tiempo de ${nombre}: ${accion}`
+    });
+
+    if (this.partida.fase === FasePartida.PRECONSTRUCCION) {
+      if (this.partida.fasePreconstruccion === FasePreconstruccion.ASENTAMIENTO) {
+        avisar("se colocó un asentamiento al azar");
+        this.colocarAlAzar("msgColocarAsentamiento", Array.from(this.tablero.vertices.keys()));
+      } else {
+        avisar("se colocó un camino al azar");
+        this.colocarAlAzar("msgColocarCamino", Array.from(this.tablero.aristas.keys()));
+      }
+      return;
+    }
+
+    switch (this.partida.faseJuego) {
+      case FaseJuego.DADOS:
+        avisar("se tiraron los dados automáticamente");
+        this.messages.msgLanzarDados(cliente);
+        break;
+
+      case FaseJuego.ACCIONES:
+        avisar("se pasó su turno");
+        this.messages.msgPasarTurno(cliente);
+        return;
+
+      case FaseJuego.DESCARTE:
+        //* Aqui el tiempo es de quienes deben descartar, no del jugador en turno
+        this.descartarPendientesAlAzar();
+        return;
+
+      case FaseJuego.LADRON:
+        avisar("se movió el ladrón al azar");
+        this.moverLadronAlAzar();
+        break;
+
+      case FaseJuego.ROBO:
+        avisar("se robó a un jugador al azar");
+        this.robarAlAzar();
+        break;
+
+      case FaseJuego.CARRETERAS:
+        avisar("perdió los caminos gratis y se pasó su turno");
+        this.partida.carreterasGratis = 0;
+        this.partida.faseJuego = FaseJuego.ACCIONES;
+        this.messages.msgPasarTurno(cliente);
+        return;
+    }
+
+    //* Si al jugador ausente le toca ahora mover al ladron o robar, se resuelve de una vez
+    if (this.partida.fase === FasePartida.JUEGO && this.partida.turnoActual === sessionId) {
+      if (this.partida.faseJuego === FaseJuego.LADRON) this.moverLadronAlAzar();
+      if (this.partida.faseJuego === FaseJuego.ROBO) this.robarAlAzar();
+    }
+  }
+
+  //* Prueba posiciones al azar hasta que una sea valida (la fase avanza al construir)
+  colocarAlAzar(mensaje: "msgColocarAsentamiento" | "msgColocarCamino", claves: string[]) {
+    const cliente = clienteSimulado(this.partida.turnoActual);
+    const antes = claveFase(this.partida);
+
+    for (const clave of mezclar(claves)) {
+      const [h, d, p] = clave.split(",").map(Number);
+      this.messages[mensaje](cliente, { h, d, p });
+      if (claveFase(this.partida) !== antes) return;
+    }
+  }
+
+  moverLadronAlAzar() {
+    const { ladron } = this.tablero;
+    const opciones = Array.from(this.tablero.hexagonos.values())
+      .filter((hexagono) => hexagono.h !== ladron.h || hexagono.d !== ladron.d);
+
+    const destino = alAzar(opciones);
+    this.messages.msgMoverLadron(clienteSimulado(this.partida.turnoActual), {
+      h: destino.h, d: destino.d
+    });
+  }
+
+  robarAlAzar() {
+    const victimas = Array.from(this.partida.jugadoresParaRobar);
+    if (victimas.length === 0) {
+      this.partida.faseJuego = FaseJuego.ACCIONES;
+      return;
+    }
+    this.messages.msgRobarJugador(clienteSimulado(this.partida.turnoActual), {
+      jugadorRobado: alAzar(victimas)
+    });
+  }
+
+  descartarPendientesAlAzar() {
+    this.broadcast("log", {
+      jugador: "Sistema: ",
+      mensaje: "Se acabó el tiempo para descartar: se descartaron cartas al azar"
+    });
+
+    for (const sessionId of Array.from(this.partida.jugadoresParaDescartar.keys())) {
+      const jugador = this.jugadores.get(sessionId);
+      const cliente = clienteSimulado(sessionId);
+
+      while (this.partida.jugadoresParaDescartar.has(sessionId)) {
+        const recurso = jugador ? cartaAlAzar(jugador) : "";
+        //* Sin cartas que descartar no hay nada que esperar de el
+        if (recurso === "") {
+          this.partida.jugadoresParaDescartar.delete(sessionId);
+          break;
+        }
+        this.messages.msgDescartarRecursos(cliente, { recurso });
+      }
+    }
+
+    if (this.partida.faseJuego === FaseJuego.DESCARTE && this.partida.jugadoresParaDescartar.size === 0) {
+      this.partida.faseJuego = FaseJuego.LADRON;
+    }
+  }
+
   onCreate(options: any) {
     console.log("room created!", this.roomId);
+
+    //* El reloj de la sala se detiene solo cuando la sala se cierra
+    this.clock.setInterval(() => this.revisarTemporizador(), INTERVALO_TEMPORIZADOR);
     //* si se ingresa codigo de acceso, se setea al atributo de codigo de acceso a la sala
     this.codigoAcceso = options.codigoAcceso || ""
+
+    //* Reglas elegidas por el anfitrion (validadas en el servidor)
+    const configuracion = leerConfiguracion(options);
+    this.partida.puntosParaGanar = configuracion.puntosParaGanar;
+    this.partida.tablero = configuracion.tablero;
+    this.partida.duracionTurno = configuracion.duracionTurno;
+    this.partida.comercioJugadores = configuracion.comercioJugadores;
+
+    if (configuracion.tablero === "principiante") {
+      generarTableroPrincipiante(this.tablero.hexagonos, this.tablero.ladron);
+    }
 
     //* seteamos la data de la sala
     this.setMetadata({
       alias: options.alias || "Catan Room",
       estado: "EN LOBBY",
       privada: options.privada || false,
-      anfitrion: options.nombre || ""
+      anfitrion: options.nombre || "",
+      //* Para mostrar las reglas en el listado del lobby
+      ...configuracion
     })
   }
 
@@ -1477,7 +1669,10 @@ export class CatanRoom extends Room {
 
     this.partida.ordenJugadores.push(client.sessionId);
 
-    this.jugadores.set(client.sessionId, new Jugador(options.nombre));
+    const jugador = new Jugador(options.nombre);
+    //* La meta de puntos depende de la configuracion de la sala
+    jugador.puntosParaGanar = this.partida.puntosParaGanar;
+    this.jugadores.set(client.sessionId, jugador);
 
     if (this.partida.creador == "") {
       this.partida.creador = client.sessionId;

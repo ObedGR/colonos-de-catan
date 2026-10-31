@@ -431,8 +431,11 @@ function Partida({ sala, onSolicitarConstruccion, onSalir }: Props) {
   const oferta = partidaActual?.ofertaIntercambio;
   const ofertaActiva = oferta && oferta.jugador !== '' && oferta.jugador === turnoActual ? oferta : null;
   // Mi turno, fase de acciones, sin otra propuesta activa y con algo que ofrecer.
+  // La sala puede desactivar el comercio entre jugadores (solo queda la banca).
+  const comercioActivo = partidaActual?.comercioJugadores ?? true;
   const puedeProponer = Boolean(
     puedePasarTurno
+      && comercioActivo
       && !ofertaActiva
       && miJugadorReal
       && Object.values(miJugadorReal.recursos).some((cantidad) => cantidad > 0),
@@ -679,6 +682,7 @@ function Partida({ sala, onSolicitarConstruccion, onSalir }: Props) {
             miSessionId={miSessionId}
             caminoMasLargo={partidaActual?.caminoMasLargo}
             ejercitoMasGrande={partidaActual?.ejercitoMasGrande}
+            metaPuntos={partidaActual?.puntosParaGanar}
           />
         </div>
         <div className="tablero" style={{ position: 'relative' }}>
@@ -762,6 +766,7 @@ function Partida({ sala, onSolicitarConstruccion, onSalir }: Props) {
               puedeProponer={puedeProponer}
               enviando={propuestaEnEspera}
               onProponer={proponerIntercambio}
+              comercioActivo={comercioActivo}
             >
               <IntercambioBanca
                 abierto={intercambioAbierto}
@@ -789,6 +794,9 @@ function Partida({ sala, onSolicitarConstruccion, onSalir }: Props) {
             sessionIdTurno={turnoActual}
             jugadores={jugadores}
             ordenJugadores={ordenJugadores}
+            tiempoRestante={partidaActual?.tiempoRestante ?? 0}
+            duracionTurno={partidaActual?.duracionTurno ?? 0}
+            esperandoDescartes={partidaActual?.faseJuego === FASE_JUEGO.DESCARTE}
           />
           <Button
             className="flex-fill"

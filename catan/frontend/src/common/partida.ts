@@ -34,6 +34,16 @@ export interface DatosPartida {
   // sessionId del que tiene el camino mas largo. Vacio si todavia nadie.
   caminoMasLargo: string;
 
+  // Segundos por fase (fijo por ahora) y los que le quedan a la fase en curso.
+  // tiempoRestante vale 0 cuando no hay temporizador (lobby o partida terminada).
+  duracionTurno: number;
+  tiempoRestante: number;
+
+  // Reglas elegidas al crear la sala (ver common/configuracion.ts).
+  puntosParaGanar: number;
+  tablero: string;
+  comercioJugadores: boolean;
+
   // Carreteras que puede construir sin pagar (carta de carreteras).
   carreterasGratis: number;
 

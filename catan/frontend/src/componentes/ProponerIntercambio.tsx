@@ -28,11 +28,15 @@ interface Props {
     puedeProponer: boolean;
     enviando: boolean;
     onProponer: (propuesta: Propuesta) => void;
+    // false si la sala desactivó el comercio entre jugadores (solo queda la banca).
+    comercioActivo?: boolean;
 }
 
 //* Area de negociar: proponer un intercambio a los demas jugadores y ver el activo
 
-function ProponerIntercambio({ children, ofertaActiva, jugadores, misRecursos, puedeProponer, enviando, onProponer }: Props) {
+function ProponerIntercambio({
+    children, ofertaActiva, jugadores, misRecursos, puedeProponer, enviando, onProponer, comercioActivo = true,
+}: Props) {
     const [abierto, setAbierto] = useState(false);
     const [entregado, setEntregado] = useState<Recurso | ''>('');
     const [cantidadEntregada, setCantidadEntregada] = useState(1);
@@ -64,7 +68,11 @@ function ProponerIntercambio({ children, ofertaActiva, jugadores, misRecursos, p
             <h3 className="text-center fs-6 fw-bold border-bottom mb-0 py-1">Negociar</h3>
 
             <div className="flex-fill d-flex flex-column justify-content-center gap-2 p-2 text-center">
-                {ofertaActiva ? (
+                {!comercioActivo ? (
+                    <small className="text-body-secondary">
+                        En esta partida solo se puede comerciar con la banca.
+                    </small>
+                ) : ofertaActiva ? (
                     <Typography variant="body2">
                         <strong>{jugadores[ofertaActiva.jugador]?.nombre ?? 'Un jugador'}</strong> ofrece{' '}
                         <strong>{ofertaActiva.cantidadOfrecida} {ofertaActiva.recursoOfrecido}</strong> por{' '}
@@ -76,9 +84,11 @@ function ProponerIntercambio({ children, ofertaActiva, jugadores, misRecursos, p
                     <small className="text-body-secondary">No hay propuestas activas.</small>
                 )}
 
-                <Button variant="outlined" size="small" disabled={!puedeProponer || enviando} onClick={abrir}>
-                    {enviando ? 'Enviando propuesta…' : 'Proponer intercambio'}
-                </Button>
+                {comercioActivo && (
+                    <Button variant="outlined" size="small" disabled={!puedeProponer || enviando} onClick={abrir}>
+                        {enviando ? 'Enviando propuesta…' : 'Proponer intercambio'}
+                    </Button>
+                )}
                 {children}
             </div>
 
