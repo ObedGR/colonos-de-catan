@@ -8,9 +8,13 @@ interface Props {
   // sessionId de quien tiene cada titulo (vacio si nadie).
   caminoMasLargo?: string;
   ejercitoMasGrande?: string;
+  // Puntos para ganar elegidos al crear la sala.
+  metaPuntos?: number;
 }
 
-function InfoJugadores({ jugadores, ordenJugadores, miSessionId, caminoMasLargo = '', ejercitoMasGrande = '' }: Props) {
+function InfoJugadores({
+  jugadores, ordenJugadores, miSessionId, caminoMasLargo = '', ejercitoMasGrande = '', metaPuntos = 10,
+}: Props) {
   const lista = ordenJugadores.length ? ordenJugadores : Object.keys(jugadores);
 
   return (
@@ -41,7 +45,7 @@ function InfoJugadores({ jugadores, ordenJugadores, miSessionId, caminoMasLargo 
                   ⚔️ +2
                 </span>
               )}
-              <span className="fw-bold flex-shrink-0 text-white">{j.puntuacion}/10</span>
+              <span className="fw-bold flex-shrink-0 text-white">{j.puntuacion}/{metaPuntos}</span>
             </div>
             <div className="d-flex justify-content-between text-white">
               <span title="Cartas de desarrollo en la mano, usables mas inusables">

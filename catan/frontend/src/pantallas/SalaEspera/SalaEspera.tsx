@@ -10,6 +10,7 @@ import Chip from "@mui/material/Chip";
 import Typography from "@mui/material/Typography";
 import { COLORES } from "../../common/jugador";
 import type { InfoSala } from "../sesionGuardada";
+import { resumenConfiguracion, type ConfiguracionPartida } from "../../common/configuracion";
 
 export interface JugadorVista {
   sessionId: string;
@@ -24,6 +25,8 @@ interface SalaEsperaProps {
   // Alias, privacidad y código: el cliente no los recibe en el estado, así
   // que Navegacion los guarda al crear o entrar. Puede ser null si faltan.
   infoSala: InfoSala | null;
+  // Reglas elegidas por el anfitrión al crear la sala.
+  configuracion: ConfiguracionPartida;
   jugadores: JugadorVista[];
   maxJugadores: number;
   minJugadores: number;
@@ -41,6 +44,7 @@ type Copiado = "id" | "codigo" | null;
 function SalaEspera({
   room,
   infoSala,
+  configuracion,
   jugadores,
   maxJugadores,
   minJugadores,
@@ -94,6 +98,12 @@ function SalaEspera({
           <p className="text-body-secondary mb-3">
             <strong>{jugadores.length}</strong> de {maxJugadores} colonos en la isla
           </p>
+
+          <div className="d-flex flex-wrap justify-content-center gap-2 mb-3" aria-label="Reglas de la partida">
+            {resumenConfiguracion(configuracion).map((regla) => (
+              <Chip key={regla} label={regla} size="small" />
+            ))}
+          </div>
 
           {/* Barra de progreso de Bootstrap partida en un tramo por asiento.
               Los tramos ocupados se pintan con el color del jugador. */}

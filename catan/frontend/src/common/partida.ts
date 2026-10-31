@@ -39,6 +39,11 @@ export interface DatosPartida {
   duracionTurno: number;
   tiempoRestante: number;
 
+  // Reglas elegidas al crear la sala (ver common/configuracion.ts).
+  puntosParaGanar: number;
+  tablero: string;
+  comercioJugadores: boolean;
+
   // Carreteras que puede construir sin pagar (carta de carreteras).
   carreterasGratis: number;
 

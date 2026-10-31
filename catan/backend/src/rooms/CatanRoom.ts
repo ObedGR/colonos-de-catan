@@ -29,6 +29,8 @@ import { actualizarCaminoMasLargo } from "../functions/caminoMasLargo.js";
 import {
   INTERVALO_TEMPORIZADOR, alAzar, cartaAlAzar, claveFase, clienteSimulado
 } from "../functions/temporizador.js";
+import { leerConfiguracion } from "../common/configuracion.js";
+import { generarTableroPrincipiante } from "../generators/generarTableroPrincipiante.js";
 
 
 export class CatanRoom extends Room {
@@ -880,6 +882,14 @@ export class CatanRoom extends Room {
         cantidadRecibida: number,
       }
     ) => {
+      //* Verificar que la sala permita comerciar entre jugadores
+      if (!this.partida.comercioJugadores) {
+        client.send("error", {
+          mensajeError: "El comercio entre jugadores está desactivado en esta partida"
+        })
+        return;
+      }
+
       //* Verificar que sea el turno del jugador
       if (this.partida.turnoActual !== client.sessionId) {
         client.send("error", {
@@ -1458,8 +1468,9 @@ export class CatanRoom extends Room {
 
   //* Lleva la cuenta regresiva de la fase en curso y la resuelve si se acaba el tiempo
   revisarTemporizador() {
-    //* Solo hay temporizador durante la colocacion inicial y el juego
-    if (this.partida.fase !== FasePartida.PRECONSTRUCCION && this.partida.fase !== FasePartida.JUEGO) {
+    //* Solo hay temporizador durante la colocacion inicial y el juego, y si la sala tiene limite
+    const enJuego = this.partida.fase === FasePartida.PRECONSTRUCCION || this.partida.fase === FasePartida.JUEGO;
+    if (!enJuego || this.partida.duracionTurno === 0) {
       this.faseCronometrada = "";
       this.partida.tiempoRestante = 0;
       return;
@@ -1622,12 +1633,25 @@ export class CatanRoom extends Room {
     //* si se ingresa codigo de acceso, se setea al atributo de codigo de acceso a la sala
     this.codigoAcceso = options.codigoAcceso || ""
 
+    //* Reglas elegidas por el anfitrion (validadas en el servidor)
+    const configuracion = leerConfiguracion(options);
+    this.partida.puntosParaGanar = configuracion.puntosParaGanar;
+    this.partida.tablero = configuracion.tablero;
+    this.partida.duracionTurno = configuracion.duracionTurno;
+    this.partida.comercioJugadores = configuracion.comercioJugadores;
+
+    if (configuracion.tablero === "principiante") {
+      generarTableroPrincipiante(this.tablero.hexagonos, this.tablero.ladron);
+    }
+
     //* seteamos la data de la sala
     this.setMetadata({
       alias: options.alias || "Catan Room",
       estado: "EN LOBBY",
       privada: options.privada || false,
-      anfitrion: options.nombre || ""
+      anfitrion: options.nombre || "",
+      //* Para mostrar las reglas en el listado del lobby
+      ...configuracion
     })
   }
 
@@ -1645,7 +1669,10 @@ export class CatanRoom extends Room {
 
     this.partida.ordenJugadores.push(client.sessionId);
 
-    this.jugadores.set(client.sessionId, new Jugador(options.nombre));
+    const jugador = new Jugador(options.nombre);
+    //* La meta de puntos depende de la configuracion de la sala
+    jugador.puntosParaGanar = this.partida.puntosParaGanar;
+    this.jugadores.set(client.sessionId, jugador);
 
     if (this.partida.creador == "") {
       this.partida.creador = client.sessionId;

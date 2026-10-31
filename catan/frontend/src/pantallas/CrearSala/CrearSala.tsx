@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import "./CrearSala.css";
 import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
@@ -7,6 +7,8 @@ import CardContent from "@mui/material/CardContent";
 import Divider from "@mui/material/Divider";
 import Switch from "@mui/material/Switch";
 import TextField from "@mui/material/TextField";
+import ToggleButton from "@mui/material/ToggleButton";
+import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import type { Theme } from "@mui/material/styles";
 import Typography from "@mui/material/Typography";
 import {
@@ -16,12 +18,41 @@ import {
   validarAlias,
   validarCodigoAcceso,
 } from "../validacionSala";
+import {
+  CONFIGURACION_POR_DEFECTO,
+  NOMBRE_TABLERO,
+  OPCIONES_DURACION,
+  OPCIONES_PUNTOS,
+  textoDuracion,
+  type ConfiguracionPartida,
+  type TipoTablero,
+} from "../../common/configuracion";
 
 // Lo que CatanRoom.onCreate sabe leer (además del nombre del jugador).
 export interface DatosNuevaSala {
   alias: string;
   privada: boolean;
   codigoAcceso?: string;
+  configuracion: ConfiguracionPartida;
+}
+
+// Las opciones no se encogen ni parten su texto; sin mayúsculas para que quepan.
+const ESTILO_OPCIONES = {
+  flexShrink: 0,
+  "& .MuiToggleButton-root": { textTransform: "none", whiteSpace: "nowrap", px: 1.5 },
+};
+
+// Fila de la sección de reglas: título a la izquierda, opciones a la derecha.
+function FilaRegla({ id, titulo, ayuda, children }: { id: string; titulo: string; ayuda: string; children: ReactNode }) {
+  return (
+    <div className="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-2">
+      <div className="d-flex flex-column">
+        <span className="fw-semibold" id={id}>{titulo}</span>
+        <small className="text-body-secondary">{ayuda}</small>
+      </div>
+      {children}
+    </div>
+  );
 }
 
 interface CrearSalaProps {
@@ -36,6 +67,7 @@ function CrearSala({ nombreJugador, onCrear, onVolver }: CrearSalaProps) {
   // Apagado por defecto: las salas son públicas salvo que se pida lo contrario.
   const [privada, setPrivada] = useState(false);
   const [codigo, setCodigo] = useState("");
+  const [configuracion, setConfiguracion] = useState<ConfiguracionPartida>(CONFIGURACION_POR_DEFECTO);
   const [intentoEnviar, setIntentoEnviar] = useState(false);
   const [creando, setCreando] = useState(false);
   const [errorServidor, setErrorServidor] = useState<string | null>(null);
@@ -57,6 +89,7 @@ function CrearSala({ nombreJugador, onCrear, onVolver }: CrearSalaProps) {
       alias: alias.trim(),
       privada,
       codigoAcceso: privada ? codigo : undefined,
+      configuracion,
     });
     // Si todo salió bien, Navegacion ya cambió de pantalla y este
     // componente se desmontó: no hay que tocar su estado.
@@ -164,6 +197,74 @@ function CrearSala({ nombreJugador, onCrear, onVolver }: CrearSalaProps) {
                 }}
               />
             )}
+
+            <section className="d-flex flex-column gap-3 p-3 border rounded" aria-labelledby="reglas-titulo">
+              <span className="fw-bold" id="reglas-titulo">⚙️ Reglas de la partida</span>
+
+              <FilaRegla id="regla-puntos" titulo="Puntos para ganar" ayuda="Menos puntos, partida más corta.">
+                <ToggleButtonGroup
+                  exclusive
+                  size="small"
+                  color="primary"
+                  value={configuracion.puntosParaGanar}
+                  // El grupo manda null al volver a pulsar la opción elegida: se ignora.
+                  onChange={(_, valor: number | null) =>
+                    valor !== null && setConfiguracion((c) => ({ ...c, puntosParaGanar: valor }))}
+                  aria-labelledby="regla-puntos"
+                  sx={ESTILO_OPCIONES}
+                >
+                  {OPCIONES_PUNTOS.map((puntos) => (
+                    <ToggleButton key={puntos} value={puntos}>{puntos}</ToggleButton>
+                  ))}
+                </ToggleButtonGroup>
+              </FilaRegla>
+
+              <FilaRegla id="regla-tablero" titulo="Tablero" ayuda="El principiante es el del reglamento oficial.">
+                <ToggleButtonGroup
+                  exclusive
+                  size="small"
+                  color="primary"
+                  value={configuracion.tablero}
+                  onChange={(_, valor: TipoTablero | null) =>
+                    valor !== null && setConfiguracion((c) => ({ ...c, tablero: valor }))}
+                  aria-labelledby="regla-tablero"
+                  sx={ESTILO_OPCIONES}
+                >
+                  {(Object.keys(NOMBRE_TABLERO) as TipoTablero[]).map((tipo) => (
+                    <ToggleButton key={tipo} value={tipo}>{NOMBRE_TABLERO[tipo]}</ToggleButton>
+                  ))}
+                </ToggleButtonGroup>
+              </FilaRegla>
+
+              <FilaRegla id="regla-duracion" titulo="Tiempo por turno" ayuda="Al acabarse, el turno se resuelve solo.">
+                <ToggleButtonGroup
+                  exclusive
+                  size="small"
+                  color="primary"
+                  value={configuracion.duracionTurno}
+                  onChange={(_, valor: number | null) =>
+                    valor !== null && setConfiguracion((c) => ({ ...c, duracionTurno: valor }))}
+                  aria-labelledby="regla-duracion"
+                  sx={ESTILO_OPCIONES}
+                >
+                  {OPCIONES_DURACION.map((segundos) => (
+                    <ToggleButton key={segundos} value={segundos}>{textoDuracion(segundos)}</ToggleButton>
+                  ))}
+                </ToggleButtonGroup>
+              </FilaRegla>
+
+              <FilaRegla
+                id="regla-comercio"
+                titulo="Comercio entre jugadores"
+                ayuda="Si se desactiva, solo se puede comerciar con la banca."
+              >
+                <Switch
+                  checked={configuracion.comercioJugadores}
+                  onChange={(e) => setConfiguracion((c) => ({ ...c, comercioJugadores: e.target.checked }))}
+                  slotProps={{ input: { "aria-labelledby": "regla-comercio" } }}
+                />
+              </FilaRegla>
+            </section>
 
             {errorServidor && (
               <Alert severity="error">{errorServidor}</Alert>
