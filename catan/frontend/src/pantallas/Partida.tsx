@@ -789,6 +789,9 @@ function Partida({ sala, onSolicitarConstruccion, onSalir }: Props) {
             sessionIdTurno={turnoActual}
             jugadores={jugadores}
             ordenJugadores={ordenJugadores}
+            tiempoRestante={partidaActual?.tiempoRestante ?? 0}
+            duracionTurno={partidaActual?.duracionTurno ?? 0}
+            esperandoDescartes={partidaActual?.faseJuego === FASE_JUEGO.DESCARTE}
           />
           <Button
             className="flex-fill"
