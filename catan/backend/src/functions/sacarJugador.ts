@@ -15,6 +15,8 @@ export function sacarJugador(
     jugadores: MapSchema<Jugador>,
     sessionId: string
 ){
+    if (partida.fase === FasePartida.FINALIZADA) return;
+
     const jugador = jugadores.get(sessionId);
     if (!jugador) return;
 
