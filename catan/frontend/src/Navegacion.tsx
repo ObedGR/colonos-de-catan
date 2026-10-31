@@ -12,6 +12,11 @@ import SalaEspera, { type JugadorVista } from "./pantallas/SalaEspera/SalaEspera
 import PartidaTablero from "./pantallas/Partida";
 import { FASE_PARTIDA } from "./common/fases";
 import {
+  CONFIGURACION_POR_DEFECTO,
+  configuracionDesde,
+  type ConfiguracionPartida,
+} from "./common/configuracion";
+import {
   actualizarToken,
   borrarSesion,
   guardarSesion,
@@ -31,7 +36,7 @@ interface JugadorEstado {
 }
 
 interface EstadoDeSala {
-  partida: {
+  partida: Partial<ConfiguracionPartida> & {
     fase: number;
     turnoActual: string;
     creador: string;
@@ -79,6 +84,8 @@ function Navegacion() {
   const [jugadores, setJugadores] = useState<JugadorVista[]>([]);
   const [fase, setFase] = useState<number>(FASE_PARTIDA.LOBBY);
   const [creador, setCreador] = useState("");
+  // Reglas de la sala, leídas del estado (las eligió el anfitrión al crearla).
+  const [configuracion, setConfiguracion] = useState<ConfiguracionPartida>(CONFIGURACION_POR_DEFECTO);
   // Desde dónde se abrió "Crear sala", para que Volver regrese ahí.
   const [origenCrear, setOrigenCrear] = useState<"elegir" | "lobby">("elegir");
   // Distingue "Salir" (voluntario) de una caída que no se pudo recuperar.
@@ -138,6 +145,7 @@ function Navegacion() {
 
       setFase(state.partida.fase);
       setCreador(state.partida.creador);
+      setConfiguracion(configuracionDesde(state.partida));
 
       const listaJugadores: JugadorVista[] = [];
       state.jugadores.forEach((jugador, sessionId) => {
@@ -208,6 +216,8 @@ function Navegacion() {
         privada: datos.privada,
         // El creador también pasa por onJoin, que compara este código.
         codigoAcceso: datos.privada ? datos.codigoAcceso : "",
+        // Reglas de la partida; el backend las valida en onCreate.
+        ...datos.configuracion,
       });
       entrarASala(nuevaSala, datos);
       return null;
@@ -305,6 +315,7 @@ function Navegacion() {
         <SalaEspera
           room={room}
           infoSala={infoSala}
+          configuracion={configuracion}
           jugadores={jugadores}
           maxJugadores={MAX_JUGADORES}
           minJugadores={MIN_JUGADORES}

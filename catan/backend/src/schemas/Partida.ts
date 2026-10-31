@@ -22,6 +22,10 @@ export class Partida extends Schema {
   @type("string") caminoMasLargo: string;
   @type("uint16") duracionTurno: number;
   @type("uint16") tiempoRestante: number;
+  //* Configuracion elegida al crear la sala (ver common/configuracion.ts)
+  @type("uint8") puntosParaGanar: number;
+  @type("string") tablero: string;
+  @type("boolean") comercioJugadores: boolean;
 
   constructor() {
     super();
@@ -39,5 +43,8 @@ export class Partida extends Schema {
     this.caminoMasLargo = "";
     this.duracionTurno = DURACION_TURNO;
     this.tiempoRestante = 0;
+    this.puntosParaGanar = 10;
+    this.tablero = "aleatorio";
+    this.comercioJugadores = true;
   }
 }

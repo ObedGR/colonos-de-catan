@@ -1,17 +1,17 @@
-import { mezclar } from "../common/mezclar.js";
 import { Jugador } from "../schemas/Jugador.js";
 
 export function robarJugador(
     jugadorReceptor: Jugador,
     jugadorRobado: Jugador
 ){
-    //* Copia de las llaves de los recursos del jugador robado y mezcla de las mismas
-    const recursos = Array.from(jugadorRobado.recursos.keys());
-    mezclar(recursos);
-    
-    //* Para cada key del jugador, si alguna llega a tener un valor mayor a 0
-    for(const recurso of recursos){
-        if(jugadorRobado.recursos.get(recurso) > 0){
+    const totalRecursos = Array.from(jugadorRobado.recursos.values())
+        .reduce((total, cantidad) => total + cantidad, 0);
+    if(totalRecursos === 0) return;
+
+    // Cada copia de un recurso ocupa una posición en el sorteo.
+    let posicion = Math.floor(Math.random() * totalRecursos);
+    for(const [recurso, cantidad] of jugadorRobado.recursos){
+        if(posicion < cantidad){
             //* El jugador robado pierde 1 copia del recurso
             jugadorRobado.recursos.set(
                 recurso,
@@ -26,5 +26,6 @@ export function robarJugador(
 
             break;
         }
+        posicion -= cantidad;
     }
 }
