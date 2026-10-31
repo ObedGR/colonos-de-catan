@@ -1511,7 +1511,7 @@ export class CatanRoom extends Room {
     }
 
     //* Si ya se estaba jugando se debe eliminar completamente
-    if(this.partida.fase === FasePartida.JUEGO || FasePartida.PRECONSTRUCCION){
+    if([FasePartida.JUEGO, FasePartida.PRECONSTRUCCION].includes(this.partida.fase)){
       //* Ver si era el creador de la sala
       const eraCreador = this.partida.creador === client.sessionId;
       
