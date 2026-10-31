@@ -2,6 +2,7 @@ import { ArraySchema, MapSchema, Schema, type } from "@colyseus/schema";
 import { FaseJuego, FasePartida, FasePreconstruccion } from "../common/enums.js";
 import { Jugador } from "./Jugador.js";
 import { OfertaIntercambio } from "./OfertaIntercambio.js";
+import { DURACION_TURNO } from "../functions/temporizador.js";
 
 export class Partida extends Schema {
   @type("string") creador: string;
@@ -19,6 +20,8 @@ export class Partida extends Schema {
   @type("uint8") carreterasGratis: number;
   @type(OfertaIntercambio) ofertaIntercambio = new OfertaIntercambio();
   @type("string") caminoMasLargo: string;
+  @type("uint16") duracionTurno: number;
+  @type("uint16") tiempoRestante: number;
 
   constructor() {
     super();
@@ -34,5 +37,7 @@ export class Partida extends Schema {
     this.ejercitoMasGrande = "";
     this.carreterasGratis = 0;
     this.caminoMasLargo = "";
+    this.duracionTurno = DURACION_TURNO;
+    this.tiempoRestante = 0;
   }
 }
