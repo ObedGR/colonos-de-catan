@@ -1,164 +1,117 @@
-import { useState, type ReactNode } from "react";
-import {
-    Button, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Stack, TextField, Typography,
-} from "@mui/material";
-import type { Jugadores, Recurso, Recursos } from "../common/jugador";
-import { RECURSOS } from "../common/jugador";
-import type { Oferta } from "../common/partida";
-
-// Lo que espera msgIntercambiarJugador en CatanRoom.
-export interface Propuesta {
-    recursoEntregado: Recurso;
-    cantidadEntregada: number;
-    recursoRecibido: Recurso;
-    cantidadRecibida: number;
-}
-
-// Cantidad maxima que se puede pedir: la banca empieza con 19 de cada recurso.
-const MAXIMO_PEDIR = 19;
-
-const numeros = (hasta: number) => Array.from({ length: hasta }, (_, i) => i + 1);
+import { useState, type ReactNode } from 'react';
+import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Stack, Typography } from '@mui/material';
+import type { Jugadores, Recursos } from '../common/jugador';
+import type { Oferta, Propuesta } from '../common/partida';
+import { resumirRecursos, tieneRecursos } from '../common/intercambio';
+import EditorIntercambio from './EditorIntercambio';
 
 interface Props {
-    children?: ReactNode;
-    // La oferta que esta sobre la mesa, o null si no hay ninguna activa.
-    ofertaActiva: Oferta | null;
-    jugadores: Jugadores;
-    misRecursos?: Recursos;
-    puedeProponer: boolean;
-    enviando: boolean;
-    onProponer: (propuesta: Propuesta) => void;
-    // false si la sala desactivó el comercio entre jugadores (solo queda la banca).
-    comercioActivo?: boolean;
+  children?: ReactNode;
+  ofertaActiva: Oferta | null;
+  jugadores: Jugadores;
+  miSessionId: string;
+  misRecursos?: Recursos;
+  comercioActivo: boolean;
+  puedeProponer: boolean;
+  puedeCerrar: boolean;
+  enviando: boolean;
+  cerrando: boolean;
+  onProponer: (propuesta: Propuesta) => void;
+  onCerrar: (jugador: string) => void;
+  onCancelar: () => void;
 }
 
-//* Area de negociar: proponer un intercambio a los demas jugadores y ver el activo
+const estados: Record<number, string> = { 0: 'Pendiente', 1: 'Aceptó', [-1]: 'Rechazó', 2: 'Contraoferta' };
+
+function RespuestasOferta({
+  oferta, jugadores, misRecursos, puedeCerrar, cerrando, onCerrar, onCancelar,
+}: Pick<Props, 'jugadores' | 'misRecursos' | 'puedeCerrar' | 'cerrando' | 'onCerrar' | 'onCancelar'> & { oferta: Oferta }) {
+  const [abierto, setAbierto] = useState(false);
+  const respuestas = Object.entries(oferta.respuestas);
+  const respondieron = respuestas.filter(([, respuesta]) => respuesta !== 0).length;
+
+  return (
+    <>
+      <Button size="small" variant="outlined" onClick={() => setAbierto(true)}>
+        Ver respuestas ({respondieron}/{respuestas.length})
+      </Button>
+      <Dialog open={abierto} onClose={() => setAbierto(false)} fullWidth maxWidth="sm" aria-labelledby="respuestas-intercambio">
+        <DialogTitle id="respuestas-intercambio">Respuestas a tu oferta</DialogTitle>
+        <DialogContent>
+          <Typography sx={{ mb: 2 }}>
+            Das <strong>{resumirRecursos(oferta.ofrece)}</strong> y pides <strong>{resumirRecursos(oferta.pide)}</strong>.
+          </Typography>
+          <Stack spacing={1}>
+            {respuestas.map(([jugador, respuesta]) => {
+              const contraoferta = oferta.contraofertas[jugador];
+              const tratoDisponible = respuesta === 1 || !!contraoferta;
+              const alcanza = tieneRecursos(misRecursos, contraoferta?.pide ?? oferta.ofrece);
+              const nombre = jugadores[jugador]?.nombre ?? 'Jugador';
+              return (
+                <div key={jugador} className="border rounded p-2">
+                  <Typography><strong>{nombre}</strong> · {estados[respuesta]}</Typography>
+                  {contraoferta && (
+                    <Typography variant="body2">
+                      Te da <strong>{resumirRecursos(contraoferta.ofrece)}</strong> y te pide{' '}
+                      <strong>{resumirRecursos(contraoferta.pide)}</strong>.
+                    </Typography>
+                  )}
+                  {tratoDisponible && (
+                    <>
+                      <Button size="small" disabled={cerrando || !puedeCerrar || !alcanza}
+                        onClick={() => onCerrar(jugador)}>
+                        Cerrar trato con {nombre}
+                      </Button>
+                      {!alcanza && <Typography variant="body2" color="error">Te faltan recursos para este trato.</Typography>}
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button color="error" disabled={cerrando} onClick={onCancelar}>Cancelar oferta</Button>
+          <Button onClick={() => setAbierto(false)}>Volver</Button>
+        </DialogActions>
+      </Dialog>
+    </>
+  );
+}
 
 function ProponerIntercambio({
-    children, ofertaActiva, jugadores, misRecursos, puedeProponer, enviando, onProponer, comercioActivo = true,
+  children, ofertaActiva, jugadores, miSessionId, misRecursos, comercioActivo, puedeProponer, puedeCerrar,
+  enviando, cerrando, onProponer, onCerrar, onCancelar,
 }: Props) {
-    const [abierto, setAbierto] = useState(false);
-    const [entregado, setEntregado] = useState<Recurso | ''>('');
-    const [cantidadEntregada, setCantidadEntregada] = useState(1);
-    const [recibido, setRecibido] = useState<Recurso | ''>('');
-    const [cantidadRecibida, setCantidadRecibida] = useState(1);
-
-    // Solo se puede ofrecer un recurso que se tenga, y hasta la cantidad que se tiene.
-    const recursosQueTengo = RECURSOS.filter((r) => (misRecursos?.[r] ?? 0) > 0);
-    const maximoDar = entregado ? (misRecursos?.[entregado] ?? 0) : 0;
-    const valida = entregado !== '' && recibido !== '' && entregado !== recibido
-        && cantidadEntregada >= 1 && cantidadEntregada <= maximoDar;
-
-    function abrir() {
-        setEntregado('');
-        setCantidadEntregada(1);
-        setRecibido('');
-        setCantidadRecibida(1);
-        setAbierto(true);
-    }
-
-    function confirmar() {
-        if (!valida) return;
-        onProponer({ recursoEntregado: entregado, cantidadEntregada, recursoRecibido: recibido, cantidadRecibida });
-        setAbierto(false);
-    }
-
-    return (
-        <div className="h-100 w-100 d-flex flex-column border rounded bg-white overflow-hidden">
-            <h3 className="text-center fs-6 fw-bold border-bottom mb-0 py-1">Negociar</h3>
-
-            <div className="flex-fill d-flex flex-column justify-content-center gap-2 p-2 text-center">
-                {!comercioActivo ? (
-                    <small className="text-body-secondary">
-                        En esta partida solo se puede comerciar con la banca.
-                    </small>
-                ) : ofertaActiva ? (
-                    <Typography variant="body2">
-                        <strong>{jugadores[ofertaActiva.jugador]?.nombre ?? 'Un jugador'}</strong> ofrece{' '}
-                        <strong>{ofertaActiva.cantidadOfrecida} {ofertaActiva.recursoOfrecido}</strong> por{' '}
-                        <strong>{ofertaActiva.cantidadSolicitada} {ofertaActiva.recursoSolicitado}</strong>.
-                        <br />
-                        <small className="text-body-secondary">Propuesta activa</small>
-                    </Typography>
-                ) : (
-                    <small className="text-body-secondary">No hay propuestas activas.</small>
-                )}
-
-                {comercioActivo && (
-                    <Button variant="outlined" size="small" disabled={!puedeProponer || enviando} onClick={abrir}>
-                        {enviando ? 'Enviando propuesta…' : 'Proponer intercambio'}
-                    </Button>
-                )}
-                {children}
-            </div>
-
-            <Dialog open={abierto} onClose={() => setAbierto(false)} fullWidth maxWidth="xs" aria-labelledby="proponer-titulo">
-                {/*Titulo del modal*/}
-                <DialogTitle id="proponer-titulo">Proponer intercambio</DialogTitle>
-
-                {/*Cuerpo del modal*/}
-                <DialogContent>
-                    <Typography color="text.secondary">
-                        Indica qué recurso das y cuál pides. Los demás jugadores verán la propuesta.
-                    </Typography>
-
-                    <Typography variant="subtitle2" sx={{ mt: 2 }}>Doy</Typography>
-                    <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-                        <TextField
-                            select fullWidth size="small" label="Recurso"
-                            value={entregado}
-                            onChange={(e) => {
-                                const r = e.target.value as Recurso;
-                                setEntregado(r);
-                                setCantidadEntregada(1);
-                                if (r === recibido) setRecibido('');
-                            }}
-                        >
-                            {recursosQueTengo.map((r) => (
-                                <MenuItem key={r} value={r} className="text-capitalize">
-                                    {r} (tienes {misRecursos?.[r] ?? 0})
-                                </MenuItem>
-                            ))}
-                        </TextField>
-                        <TextField
-                            select size="small" label="Cantidad" sx={{ minWidth: 100 }}
-                            value={cantidadEntregada}
-                            disabled={entregado === ''}
-                            onChange={(e) => setCantidadEntregada(Number(e.target.value))}
-                        >
-                            {numeros(Math.max(maximoDar, 1)).map((n) => <MenuItem key={n} value={n}>{n}</MenuItem>)}
-                        </TextField>
-                    </Stack>
-
-                    <Typography variant="subtitle2" sx={{ mt: 2 }}>Pido</Typography>
-                    <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-                        <TextField
-                            select fullWidth size="small" label="Recurso"
-                            value={recibido}
-                            onChange={(e) => setRecibido(e.target.value as Recurso)}
-                        >
-                            {RECURSOS.filter((r) => r !== entregado).map((r) => (
-                                <MenuItem key={r} value={r} className="text-capitalize">{r}</MenuItem>
-                            ))}
-                        </TextField>
-                        <TextField
-                            select size="small" label="Cantidad" sx={{ minWidth: 100 }}
-                            value={cantidadRecibida}
-                            onChange={(e) => setCantidadRecibida(Number(e.target.value))}
-                        >
-                            {numeros(MAXIMO_PEDIR).map((n) => <MenuItem key={n} value={n}>{n}</MenuItem>)}
-                        </TextField>
-                    </Stack>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setAbierto(false)}>Cancelar</Button>
-                    <Button variant="contained" disabled={!valida} onClick={confirmar}>
-                        Proponer
-                    </Button>
-                </DialogActions>
-            </Dialog>
-        </div>
-    );
+  const miRespuesta = ofertaActiva?.respuestas[miSessionId];
+  return (
+    <div className="h-100 w-100 d-flex flex-column border rounded bg-white overflow-hidden">
+      <h3 className="text-center fs-6 fw-bold border-bottom mb-0 py-1">Negociar</h3>
+      <div className="flex-fill d-flex flex-column gap-2 p-2 text-center overflow-auto">
+        {!comercioActivo ? (
+          <small className="text-body-secondary">El comercio entre jugadores está desactivado.</small>
+        ) : ofertaActiva ? (
+          <Typography variant="body2">
+            <strong>{jugadores[ofertaActiva.jugador]?.nombre ?? 'Un jugador'}</strong> ofrece{' '}
+            <strong>{resumirRecursos(ofertaActiva.ofrece)}</strong> por{' '}
+            <strong>{resumirRecursos(ofertaActiva.pide)}</strong>.
+          </Typography>
+        ) : <small className="text-body-secondary">No hay propuestas activas.</small>}
+        {ofertaActiva?.jugador === miSessionId && (
+          <RespuestasOferta key={ofertaActiva.id} oferta={ofertaActiva} jugadores={jugadores}
+            misRecursos={misRecursos} puedeCerrar={puedeCerrar} cerrando={cerrando}
+            onCerrar={onCerrar} onCancelar={onCancelar} />
+        )}
+        {miRespuesta === 1 && <small>Aceptaste. Esperando el cierre del trato.</small>}
+        {miRespuesta === 2 && <small>Contraoferta enviada. Esperando el cierre del trato.</small>}
+        {miRespuesta === -1 && <small>Rechazaste esta oferta.</small>}
+        {puedeProponer && (
+          <EditorIntercambio titulo="Proponer intercambio" misRecursos={misRecursos} enviando={enviando} onEnviar={onProponer} />
+        )}
+        {children}
+      </div>
+    </div>
+  );
 }
 
 export default ProponerIntercambio;

@@ -37,8 +37,11 @@ import UsarCarta, { type CartaUsable } from '../componentes/UsarCarta';
 import ElegirAbundancia from '../componentes/ElegirAbundancia';
 import ElegirMonopolio from '../componentes/ElegirMonopolio';
 import FinPartida from '../componentes/FinPartida';
-import ProponerIntercambio, { type Propuesta } from '../componentes/ProponerIntercambio';
+import ProponerIntercambio from '../componentes/ProponerIntercambio';
 import ResponderIntercambio, { type Respuesta } from '../componentes/ResponderIntercambio';
+import type { Propuesta } from '../common/partida';
+import { DURACION_ANIMACION_DADOS } from '../common/dados';
+import { DURACION_RESALTADO, lineasProduccion, type Produccion } from '../common/produccion';
 
 const recursosPrueba: Recursos = {
   madera: 2,
@@ -84,6 +87,12 @@ function Partida({ sala, onSolicitarConstruccion, onSalir }: Props) {
   const [objetivoConstruccion, setObjetivoConstruccion] = useState<ObjetivoConstruccion | null>(null);
   const [estadoConstruccion, setEstadoConstruccion] = useState('');
   const [resultadoDados, setResultadoDados] = useState<ResultadoDados | null>(null);
+  // Hexágonos que produjeron en la última tirada (se iluminan unos segundos).
+  const [hexagonosProductivos, setHexagonosProductivos] = useState<string[]>([]);
+  // true si esta pantalla pidió la tirada: solo quien tira ve la animación del dado.
+  const tiradaPropia = useRef(false);
+  // Se fija al llegar "dados": si el resumen de esa tirada debe esperar la animación.
+  const esperarAnimacion = useRef(false);
   const [lanzandoDados, setLanzandoDados] = useState(false);
   const [pasandoTurno, setPasandoTurno] = useState(false);
   const [descarteEnEspera, setDescarteEnEspera] = useState<number | null>(null);
@@ -115,7 +124,8 @@ function Partida({ sala, onSolicitarConstruccion, onSalir }: Props) {
   // true desde que se envia la propuesta hasta que el servidor la publica.
   const [propuestaEnEspera, setPropuestaEnEspera] = useState(false);
   // true desde que se responde la propuesta hasta que el servidor lo registra.
-  const [respuestaEnEspera, setRespuestaEnEspera] = useState(false);
+  const [respuestaEnEspera, setRespuestaEnEspera] = useState<number | null>(null);
+  const [cierreEnEspera, setCierreEnEspera] = useState<number | null>(null);
   const [intercambioAbierto, setIntercambioAbierto] = useState(false);
   const [intercambioEnEspera, setIntercambioEnEspera] = useState(false);
   const intercambioPendiente = useRef<{
@@ -205,14 +215,6 @@ function Partida({ sala, onSolicitarConstruccion, onSalir }: Props) {
         setPropuestaEnEspera(false);
       }
 
-      /* La respuesta se confirma cuando el backend deja de tenerme como
-         pendiente: respondi (1 o -1) o borro la oferta. Al borrarla vacia
-         "respuestas", asi que mi clave no existe (undefined) y tambien libera.
-         Ojo: no usar "?? 0", porque undefined pasaria a 0 y nunca se liberaria. */
-      if (!estado || estado.partida.ofertaIntercambio.respuestas[salaActual.sessionId] !== 0) {
-        setRespuestaEnEspera(false);
-      }
-
       // La abundancia se confirma cuando el servidor le resta la carta al
       // jugador. Si cambia el turno o la fase, se cancela.
       setAbundancia((anterior) => {
@@ -277,6 +279,9 @@ function Partida({ sala, onSolicitarConstruccion, onSalir }: Props) {
     const dejarDeEscucharDados = sala.onMessage('dados', (resultado: ResultadoDados) => {
       setResultadoDados(resultado);
       setLanzandoDados(false);
+      // Cada tirada consume la marca: un 7 no trae "produccion" y no debe arrastrarla.
+      esperarAnimacion.current = tiradaPropia.current;
+      tiradaPropia.current = false;
     });
 
     // CatanRoom responde "error" al cliente si una validación falla. El
@@ -284,13 +289,15 @@ function Partida({ sala, onSolicitarConstruccion, onSalir }: Props) {
     // los botones para que la interfaz no quede bloqueada tras el rechazo.
     const dejarDeEscucharErrores = sala.onMessage('error', () => {
       setLanzandoDados(false);
+      tiradaPropia.current = false;
       setPasandoTurno(false);
       setDescarteEnEspera(null);
       setMoviendoLadron(false);
       setCompraEnEspera(null);
       setRobando(false);
       setPropuestaEnEspera(false);
-      setRespuestaEnEspera(false);
+      setRespuestaEnEspera(null);
+      setCierreEnEspera(null);
       // Si el servidor rechaza el caballero, se puede elegir otro hexagono.
       setCaballero((anterior) => (typeof anterior === 'number' ? 'eligiendo' : anterior));
       // Si el servidor rechaza la abundancia, el dialogo sigue abierto para corregir.
@@ -319,11 +326,30 @@ function Partida({ sala, onSolicitarConstruccion, onSalir }: Props) {
         agregar({ tipo: 'log', jugador, mensaje }),
     );
 
+    /* Resumen de la tirada: quién cobró qué. Quien tiró espera a que termine la
+       animación del dado para no adelantar el número; los demás ya lo ven. */
+    const temporizadores: ReturnType<typeof setTimeout>[] = [];
+    const dejarDeEscucharProduccion = sala.onMessage('produccion', (produccion: Produccion) => {
+      const espera = esperarAnimacion.current ? DURACION_ANIMACION_DADOS : 0;
+      esperarAnimacion.current = false;
+
+      temporizadores.push(setTimeout(() => {
+        const nombreDe = (id: string) => leerEstado(sala)?.jugadores[id]?.nombre ?? 'Un jugador';
+        lineasProduccion(produccion, nombreDe).forEach((mensaje) =>
+          agregar({ tipo: 'log', jugador: 'Sistema: ', mensaje }));
+
+        setHexagonosProductivos(produccion.productivos);
+        temporizadores.push(setTimeout(() => setHexagonosProductivos([]), DURACION_RESALTADO));
+      }, espera));
+    });
+
     return () => {
       dejarDeEscucharDados();
       dejarDeEscucharErrores();
       dejarDeEscucharChat();
       dejarDeEscucharLog();
+      dejarDeEscucharProduccion();
+      temporizadores.forEach(clearTimeout);
     };
   }, [sala]);
 
@@ -429,21 +455,22 @@ function Partida({ sala, onSolicitarConstruccion, onSalir }: Props) {
   /* Propuesta de intercambio activa. Solo cuenta si es del jugador en turno
      (el backend la borra al pasar el turno; esto es solo por seguridad). */
   const oferta = partidaActual?.ofertaIntercambio;
-  const ofertaActiva = oferta && oferta.jugador !== '' && oferta.jugador === turnoActual ? oferta : null;
-  // Mi turno, fase de acciones, sin otra propuesta activa y con algo que ofrecer.
-  // La sala puede desactivar el comercio entre jugadores (solo queda la banca).
   const comercioActivo = partidaActual?.comercioJugadores ?? true;
+  const ofertaActiva = comercioActivo && partidaActual?.fase === FASE_PARTIDA.JUEGO
+    && oferta?.jugador && oferta.jugador === turnoActual ? oferta : null;
+  const soyOferente = ofertaActiva?.jugador === miSessionId;
+  const cerrandoOferta = ofertaActiva !== null && cierreEnEspera === ofertaActiva.id;
+  // Mi turno, fase de acciones, sin otra propuesta activa y con algo que ofrecer.
   const puedeProponer = Boolean(
-    puedePasarTurno
+    puedePasarTurno && !pasandoTurno
       && comercioActivo
       && !ofertaActiva
       && miJugadorReal
       && Object.values(miJugadorReal.recursos).some((cantidad) => cantidad > 0),
   );
-  /* Me toca responder si el backend me tiene como pendiente (0) en la oferta.
-     Al responder (1 o -1) o al cerrarse la oferta, deja de cumplirse. */
   const debeResponder = Boolean(
-    sala && ofertaActiva && ofertaActiva.respuestas[miSessionId] === 0,
+    sala && partidaActual?.faseJuego === FASE_JUEGO.ACCIONES
+      && ofertaActiva && ofertaActiva.respuestas[miSessionId] === 0,
   );
 
   /* Preconstruccion: el backend solo acepta la pieza de la subfase en curso y
@@ -512,6 +539,7 @@ function Partida({ sala, onSolicitarConstruccion, onSalir }: Props) {
     // clic inválido en la interfaz y bloquea repeticiones mientras responde.
     if (!sala || !puedeLanzarDados || lanzandoDados) return;
     setLanzandoDados(true);
+    tiradaPropia.current = true;
     sala.send('msgLanzarDados');
   }
 
@@ -540,10 +568,21 @@ function Partida({ sala, onSolicitarConstruccion, onSalir }: Props) {
   }
 
   function responderIntercambio(respuesta: Respuesta) {
-    // El backend valida; si acepto sin tener lo que se pide, lo cambia a -1.
-    if (!sala || !debeResponder || respuestaEnEspera) return;
-    setRespuestaEnEspera(true);
-    sala.send('msgResponderIntercambio', { respuesta });
+    if (!sala || !ofertaActiva || !debeResponder || respuestaEnEspera === ofertaActiva.id) return;
+    setRespuestaEnEspera(ofertaActiva.id);
+    sala.send('msgResponderIntercambio', { ...respuesta, ofertaId: ofertaActiva.id });
+  }
+
+  function cerrarIntercambio(jugador: string) {
+    if (!sala || !ofertaActiva || !soyOferente || !puedePasarTurno || pasandoTurno || cerrandoOferta) return;
+    setCierreEnEspera(ofertaActiva.id);
+    sala.send('msgCerrarIntercambio', { jugador, ofertaId: ofertaActiva.id });
+  }
+
+  function cancelarIntercambio() {
+    if (!sala || !ofertaActiva || !soyOferente || cerrandoOferta) return;
+    setCierreEnEspera(ofertaActiva.id);
+    sala.send('msgCancelarIntercambio', { ofertaId: ofertaActiva.id });
   }
 
   function elegirCarta(carta: CartaUsable) {
@@ -732,6 +771,7 @@ function Partida({ sala, onSolicitarConstruccion, onSalir }: Props) {
             onSeleccionarObjetivo={seleccionarObjetivo}
             moviendoLadron={(puedeMoverLadron && !moviendoLadron) || caballero === 'eligiendo'}
             onSeleccionarHexagonoLadron={seleccionarHexagonoLadron}
+            hexagonosResaltados={hexagonosProductivos}
           />
         </div>
         <div className="carRecursos">
@@ -752,21 +792,27 @@ function Partida({ sala, onSolicitarConstruccion, onSalir }: Props) {
               vuelve el recuadro normal de proponer (con el intercambio con la banca). */}
           {debeResponder && ofertaActiva ? (
             <ResponderIntercambio
+              key={ofertaActiva.id}
               oferta={ofertaActiva}
               nombreOferente={jugadores[ofertaActiva.jugador]?.nombre ?? 'Un jugador'}
               misRecursos={miJugadorReal?.recursos}
-              enviando={respuestaEnEspera}
+              enviando={respuestaEnEspera === ofertaActiva.id}
               onResponder={responderIntercambio}
             />
           ) : (
             <ProponerIntercambio
               ofertaActiva={ofertaActiva}
               jugadores={jugadores}
+              miSessionId={miSessionId}
+              comercioActivo={comercioActivo}
               misRecursos={miJugadorReal?.recursos}
               puedeProponer={puedeProponer}
+              puedeCerrar={puedePasarTurno && !pasandoTurno}
               enviando={propuestaEnEspera}
+              cerrando={cerrandoOferta}
               onProponer={proponerIntercambio}
-              comercioActivo={comercioActivo}
+              onCerrar={cerrarIntercambio}
+              onCancelar={cancelarIntercambio}
             >
               <IntercambioBanca
                 abierto={intercambioAbierto}

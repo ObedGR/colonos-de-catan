@@ -1,63 +1,42 @@
-import { Button, Stack, Typography } from "@mui/material";
-import type { Recurso, Recursos } from "../common/jugador";
-import type { Oferta } from "../common/partida";
+import { Button, Stack, Typography } from '@mui/material';
+import type { Recursos } from '../common/jugador';
+import type { Oferta, Propuesta } from '../common/partida';
+import { resumirRecursos, tieneRecursos } from '../common/intercambio';
+import EditorIntercambio from './EditorIntercambio';
 
-// Lo que espera msgResponderIntercambio en CatanRoom: 1 acepta, -1 rechaza.
-export type Respuesta = 1 | -1;
+export type Respuesta = { respuesta: 1 | -1 } | { respuesta: 2; propuesta: Propuesta };
 
 interface Props {
-    oferta: Oferta;
-    nombreOferente: string;
-    misRecursos?: Recursos;
-    enviando: boolean;
-    onResponder: (respuesta: Respuesta) => void;
+  oferta: Oferta;
+  nombreOferente: string;
+  misRecursos?: Recursos;
+  enviando: boolean;
+  onResponder: (respuesta: Respuesta) => void;
 }
 
-//* Se muestra a los jugadores que todavia no respondieron la propuesta activa
-
 function ResponderIntercambio({ oferta, nombreOferente, misRecursos, enviando, onResponder }: Props) {
-    /* Sin lo que se pide, aceptar no sirve: el backend lo cambia a "no". Por eso
-       en ese caso solo se deja rechazar. */
-    const tengo = misRecursos?.[oferta.recursoSolicitado as Recurso] ?? 0;
-    const alcanza = tengo >= oferta.cantidadSolicitada;
-
-    return (
-        <div className="h-100 w-100 d-flex flex-column border rounded bg-white overflow-hidden">
-            <h3 className="text-center fs-6 fw-bold border-bottom mb-0 py-1">Negociar</h3>
-
-            <div className="flex-fill d-flex flex-column justify-content-center gap-2 p-2 text-center">
-                <Typography variant="body2">
-                    <strong>{nombreOferente}</strong> te ofrece{' '}
-                    <strong>{oferta.cantidadOfrecida} {oferta.recursoOfrecido}</strong> a cambio de{' '}
-                    <strong>{oferta.cantidadSolicitada} {oferta.recursoSolicitado}</strong>.
-                </Typography>
-                {!alcanza && (
-                    <small className="text-danger">
-                        Tienes {tengo} {oferta.recursoSolicitado}: no te alcanza para aceptar.
-                    </small>
-                )}
-
-                <Stack direction="row" spacing={1} sx={{ justifyContent: 'center' }}>
-                    <Button
-                        variant="outlined" color="error" size="small"
-                        disabled={enviando}
-                        onClick={() => onResponder(-1)}
-                        aria-label="Rechazar la propuesta"
-                    >
-                        ❌ Rechazar
-                    </Button>
-                    <Button
-                        variant="contained" color="success" size="small"
-                        disabled={enviando || !alcanza}
-                        onClick={() => onResponder(1)}
-                        aria-label="Aceptar la propuesta"
-                    >
-                        ✅ Aceptar
-                    </Button>
-                </Stack>
-            </div>
-        </div>
-    );
+  const alcanza = tieneRecursos(misRecursos, oferta.pide);
+  return (
+    <div className="h-100 w-100 d-flex flex-column border rounded bg-white overflow-hidden">
+      <h3 className="text-center fs-6 fw-bold border-bottom mb-0 py-1">Negociar</h3>
+      <div className="flex-fill d-flex flex-column gap-2 p-2 text-center overflow-auto">
+        <Typography variant="body2">
+          <strong>{nombreOferente}</strong> te ofrece <strong>{resumirRecursos(oferta.ofrece)}</strong> a cambio de{' '}
+          <strong>{resumirRecursos(oferta.pide)}</strong>.
+        </Typography>
+        {!alcanza && <small className="text-danger">Te faltan recursos para aceptar esta oferta.</small>}
+        <Stack direction="row" useFlexGap spacing={1} sx={{ justifyContent: 'center', flexWrap: 'wrap' }}>
+          <Button variant="outlined" color="error" size="small" disabled={enviando}
+            onClick={() => onResponder({ respuesta: -1 })}>Rechazar</Button>
+          <Button variant="contained" color="success" size="small" disabled={enviando || !alcanza}
+            onClick={() => onResponder({ respuesta: 1 })}>Aceptar</Button>
+        </Stack>
+        <EditorIntercambio titulo="Hacer contraoferta" misRecursos={misRecursos}
+          enviando={enviando || !Object.values(misRecursos ?? {}).some(cantidad => cantidad > 0)}
+          onEnviar={propuesta => onResponder({ respuesta: 2, propuesta })} />
+      </div>
+    </div>
+  );
 }
 
 export default ResponderIntercambio;
