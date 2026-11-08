@@ -1,37 +1,47 @@
-import { MapSchema } from "@colyseus/schema";
 import { Jugador } from "../schemas/Jugador.js";
-import { OfertaIntercambio } from "../schemas/OfertaIntercambio.js";
+import { Propuesta, PropuestaIntercambio } from "../schemas/OfertaIntercambio.js";
 
-export function intercambiarRecursos(
-    jugadorOferente: string,
-    jugadorAceptante: string,
-    jugadores: MapSchema<Jugador>,
-    oferta: OfertaIntercambio
-){
-    const oferente = jugadores.get(jugadorOferente);
-    const aceptante = jugadores.get(jugadorAceptante);
+const RECURSOS_VALIDOS = new Set(["madera", "trigo", "lana", "ladrillo", "mineral"]);
 
-    //* Restar los recursos ofrecidos al que ofrece
-    oferente.recursos.set(
-        oferta.recursoOfrecido,
-        oferente.recursos.get(oferta.recursoOfrecido) - oferta.cantidadOfrecida   
-    );
+export function tieneRecursos(jugador: Jugador, recursos: Iterable<[string, number]>) {
+    for (const [recurso, cantidad] of recursos) {
+        if ((jugador.recursos.get(recurso) ?? 0) < cantidad) return false;
+    }
+    return true;
+}
 
-    //* Restar los recursos solicitados al que acepta
-    aceptante.recursos.set(
-        oferta.recursoSolicitado,
-        aceptante.recursos.get(oferta.recursoSolicitado) - oferta.cantidadSolicitada
-    );
+export function validarPropuesta(propuesta: Propuesta | undefined, jugador: Jugador): string | null {
+    for (const lado of [propuesta?.ofrece, propuesta?.pide]) {
+        if (!lado || typeof lado !== "object" || Array.isArray(lado) || Object.keys(lado).length === 0) {
+            return "Debes ofrecer y pedir al menos un recurso";
+        }
+        for (const [recurso, cantidad] of Object.entries(lado)) {
+            if (!RECURSOS_VALIDOS.has(recurso) || !Number.isInteger(cantidad) || cantidad < 1 || cantidad > 19) {
+                return "Usa recursos válidos y cantidades enteras entre 1 y 19";
+            }
+        }
+    }
+    if (Object.keys(propuesta.ofrece).some(recurso => Object.hasOwn(propuesta.pide, recurso))) {
+        return "No puedes ofrecer y pedir el mismo recurso";
+    }
+    if (!tieneRecursos(jugador, Object.entries(propuesta.ofrece))) {
+        return "No tienes todos los recursos que ofreces";
+    }
+    return null;
+}
 
-    //* Sumar los recursos solicitados al que ofrece
-    oferente.recursos.set(
-        oferta.recursoSolicitado,
-        oferente.recursos.get(oferta.recursoSolicitado) + oferta.cantidadSolicitada
-    );
+export function intercambiarRecursos(oferente: Jugador, aceptante: Jugador, propuesta: PropuestaIntercambio) {
+    if (!tieneRecursos(oferente, propuesta.ofrece) || !tieneRecursos(aceptante, propuesta.pide)) {
+        return false;
+    }
 
-    //* Sumar los recursos ofrecidos al que acepta
-    aceptante.recursos.set(
-        oferta.recursoOfrecido,
-        aceptante.recursos.get(oferta.recursoOfrecido) + oferta.cantidadOfrecida
-    );
+    for (const [recurso, cantidad] of propuesta.ofrece) {
+        oferente.recursos.set(recurso, oferente.recursos.get(recurso) - cantidad);
+        aceptante.recursos.set(recurso, aceptante.recursos.get(recurso) + cantidad);
+    }
+    for (const [recurso, cantidad] of propuesta.pide) {
+        aceptante.recursos.set(recurso, aceptante.recursos.get(recurso) - cantidad);
+        oferente.recursos.set(recurso, oferente.recursos.get(recurso) + cantidad);
+    }
+    return true;
 }

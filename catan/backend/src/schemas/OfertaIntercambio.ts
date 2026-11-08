@@ -1,64 +1,58 @@
 import { MapSchema, Schema, type } from "@colyseus/schema";
 import { Jugador } from "./Jugador.js";
 
-export class OfertaIntercambio extends Schema {
+export interface Propuesta {
+    ofrece: Record<string, number>;
+    pide: Record<string, number>;
+}
 
-    @type("string") jugador: string;
-    @type("string") recursoOfrecido: string;
-    @type("uint8") cantidadOfrecida: number;
-    @type("string") recursoSolicitado: string;
-    @type("uint8") cantidadSolicitada: number;
+export class PropuestaIntercambio extends Schema {
+    @type({ map: "uint8" }) ofrece = new MapSchema<number>();
+    @type({ map: "uint8" }) pide = new MapSchema<number>();
 
-    @type({ map: "int8" })
-    respuestas = new MapSchema<number>();
-
-    constructor(){
-        super();
-        this.jugador = "";
-        this.recursoOfrecido = "";
-        this.cantidadOfrecida = 0;
-        this.recursoSolicitado = "";
-        this.cantidadSolicitada = 0;
+    cargar(propuesta: Propuesta) {
+        for (const [recurso, cantidad] of Object.entries(propuesta.ofrece)) {
+            this.ofrece.set(recurso, cantidad);
+        }
+        for (const [recurso, cantidad] of Object.entries(propuesta.pide)) {
+            this.pide.set(recurso, cantidad);
+        }
     }
+}
 
-    setOferta(
-        jugador: string,
-        jugadores: MapSchema<Jugador>,
-        recursoOfrecido: string,
-        cantidadOfrecida: number,
-        recursoSolicitado: string,
-        cantidadSolicitada: number
-    ){
+export class OfertaIntercambio extends PropuestaIntercambio {
+    @type("uint32") id = 0;
+    @type("string") jugador = "";
+    @type({ map: "int8" }) respuestas = new MapSchema<number>();
+    @type({ map: PropuestaIntercambio }) contraofertas = new MapSchema<PropuestaIntercambio>();
+
+    setOferta(jugador: string, jugadores: MapSchema<Jugador>, propuesta: Propuesta) {
+        this.limpiarOferta();
+        this.id++;
         this.jugador = jugador;
-        this.recursoOfrecido = recursoOfrecido;
-        this.cantidadOfrecida = cantidadOfrecida;
-        this.recursoSolicitado = recursoSolicitado;
-        this.cantidadSolicitada = cantidadSolicitada;
+        this.cargar(propuesta);
 
-        this.respuestas.clear();
         for (const [sessionId] of jugadores) {
-            if(sessionId !== jugador) this.respuestas.set(sessionId, 0);
+            if (sessionId !== jugador) this.respuestas.set(sessionId, 0);
         }
     }
 
-    registrarRespuesta(jugador: string, respuesta: number){
-        this.respuestas.set(jugador, respuesta);
+    registrarContraoferta(jugador: string, propuesta: Propuesta) {
+        const contraoferta = new PropuestaIntercambio();
+        contraoferta.cargar(propuesta);
+        this.contraofertas.set(jugador, contraoferta);
+        this.respuestas.set(jugador, 2);
     }
 
-    todosRechazaron(){
-        for (const respuesta of this.respuestas.values()){
-            if(respuesta !== -1) return false;
-        }
-        return true;
+    todosRechazaron() {
+        return [...this.respuestas.values()].every(respuesta => respuesta === -1);
     }
 
-    limpiarOferta(){
+    limpiarOferta() {
         this.jugador = "";
-        this.recursoOfrecido = "";
-        this.cantidadOfrecida = 0;
-        this.recursoSolicitado = "";
-        this.cantidadSolicitada = 0;
+        this.ofrece.clear();
+        this.pide.clear();
         this.respuestas.clear();
+        this.contraofertas.clear();
     }
-
 }

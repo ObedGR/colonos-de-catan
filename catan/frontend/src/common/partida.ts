@@ -1,3 +1,5 @@
+import type { Recurso } from './jugador';
+
 export interface DatosPartida {
   // sessionId de quien creo la sala. Solo el puede iniciar la partida.
   creador: string;
@@ -51,16 +53,18 @@ export interface DatosPartida {
   ofertaIntercambio: Oferta;
 }
 
-/* schemas/OfertaIntercambio.ts — un jugador propone cambiar recursos y los
-   demas votan. */
-export interface Oferta {
+export type LoteRecursos = Partial<Record<Recurso, number>>;
+
+export interface Propuesta {
+  ofrece: LoteRecursos;
+  pide: LoteRecursos;
+}
+
+export interface Oferta extends Propuesta {
+  id: number;
   // sessionId de quien propone. Vacio si no hay ninguna oferta en curso.
   jugador: string;
-  recursoOfrecido: string;
-  cantidadOfrecida: number;
-  recursoSolicitado: string;
-  cantidadSolicitada: number;
-  /* sessionId -> voto: 0 no ha contestado, 1 acepta, -1 rechaza. El backend la
-     llena con todos los jugadores menos el que propone. */
+  // 0 pendiente, 1 acepta, -1 rechaza, 2 envió una contraoferta.
   respuestas: Record<string, number>;
+  contraofertas: Record<string, Propuesta>;
 }
