@@ -63,6 +63,7 @@ export function sacarJugador(
         oferta.limpiarOferta();
     }else if(oferta.respuestas.has(sessionId)){
         oferta.respuestas.delete(sessionId);
+        oferta.contraofertas.delete(sessionId);
         if (oferta.jugador !== "" && oferta.todosRechazaron()){
             oferta.limpiarOferta();
         }

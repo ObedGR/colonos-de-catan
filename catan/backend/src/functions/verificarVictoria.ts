@@ -11,7 +11,8 @@ export function verificarVictoria(
 ) {
     if (jugador.puntosParaGanar <= 0) {
         partida.ganador = sessionId;
-        partida.fase = FasePartida.FINALIZADA
+        partida.fase = FasePartida.FINALIZADA;
+        partida.ofertaIntercambio.limpiarOferta();
 
         //* Avisar a todos del ganador con el log
         room.broadcast("log", {
