@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import './tirarDados.css';
+import { DURACION_ANIMACION_DADOS } from '../common/dados';
 
 // El resultado siempre llega desde el evento "dados" de CatanRoom.
 // No se generan números en el cliente, para que todos vean la misma tirada.
@@ -17,8 +18,6 @@ interface Props {
 }
 
 const CARAS_DADO = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'] as const;
-// Duración del GIF existente en public/gif/Dados.gif, medida en el componente anterior.
-const DURACION_GIF = 2900;
 
 function caraDado(valor: number): string {
   // El backend solo produce valores de 1 a 6. La alternativa evita que un
@@ -33,7 +32,7 @@ function TirarDados({ resultado, puedeLanzar, lanzando, onLanzar }: Props) {
 
   useEffect(() => {
     if (!girando) return;
-    const temporizador = setTimeout(() => setGirando(false), DURACION_GIF);
+    const temporizador = setTimeout(() => setGirando(false), DURACION_ANIMACION_DADOS);
     return () => clearTimeout(temporizador);
   }, [girando]);
 

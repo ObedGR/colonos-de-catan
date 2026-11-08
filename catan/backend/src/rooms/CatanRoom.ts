@@ -2,9 +2,7 @@ import { Room, Client, CloseCode, Delayed } from "colyseus";
 import { CatanState } from "../states/CatanState.js";
 import { Jugador } from "../schemas/Jugador.js";
 import { Desarrollo, FaseJuego, FasePartida, FasePreconstruccion } from "../common/enums.js";
-import { buscarHexagonos } from "../functions/buscarHexagonos.js";
-import { darRecursosJugador } from "../functions/darRecursosJugador.js";
-import { verticesDelHexagono } from "../functions/verticesDelHexagono.js";
+import { repartirProduccion } from "../functions/repartirProduccion.js";
 import { lanzarDados } from "../functions/lanzarDados.js";
 import { mezclar } from "../common/mezclar.js";
 import { siguienteTurno } from "../functions/siguienteTurno.js";
@@ -197,23 +195,10 @@ export class CatanRoom extends Room {
 
       }
 
-      //* Buscar los hexagonos con dicho numero resultado de la suma de los dados
-      const hexagonosEncontrados = buscarHexagonos(this.tablero.hexagonos, suma);
+      //* Repartir los recursos de los hexagonos con ese numero y avisar a todos quien cobro
+      const produccion = repartirProduccion(this.tablero, this.jugadores, this.banca, suma);
+      this.broadcast("produccion", produccion);
 
-      //* Traer los vertices adyacentes para cada hexagono encontrado
-      hexagonosEncontrados.forEach((hexagono) => {
-        const vertices = verticesDelHexagono(this.tablero.vertices, hexagono);
-
-        //* Dar los recursos correspondientes en cada vertice encontrado
-        vertices.forEach((vertice) => {
-          darRecursosJugador(
-            hexagono,
-            vertice,
-            this.jugadores,
-            this.banca,
-            this.tablero.ladron);
-        })
-      })
       this.partida.faseJuego = FaseJuego.ACCIONES;
     },
 
