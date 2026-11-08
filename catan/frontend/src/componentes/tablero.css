@@ -20,6 +20,20 @@
 .tbTerreno-4 { fill: #c96b4a; } /* colina / ladrillo */
 .tbTerreno-5 { fill: #9aa0a6; } /* montaña / piedra */
 
+/* Hexágonos que acaban de producir en la tirada: borde dorado que pulsa */
+.tbHexProduce {
+    stroke: #FFD54F;
+    stroke-width: 6;
+    animation: tbProduce 0.8s ease-in-out infinite alternate;
+}
+@keyframes tbProduce {
+    from { filter: brightness(1); }
+    to   { filter: brightness(1.25) drop-shadow(0 0 6px #FFD54F); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .tbHexProduce { animation: none; filter: brightness(1.2); }
+}
+
 /*  Aristas (caminos) */
 .tbArista {
     stroke-width: 6;

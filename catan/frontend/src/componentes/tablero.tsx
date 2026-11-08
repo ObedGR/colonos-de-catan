@@ -85,6 +85,8 @@ interface Props {
   // true cuando el jugador debe elegir a que hexagono mover al ladron.
   moviendoLadron?: boolean;
   onSeleccionarHexagonoLadron?: (hexagono: Coordenada) => void;
+  // Claves "h,d" de los hexágonos que acaban de producir en la tirada.
+  hexagonosResaltados?: string[];
 }
 
 function esElObjetivo(
@@ -105,6 +107,7 @@ function Tablero({
   onSeleccionarObjetivo,
   moviendoLadron = false,
   onSeleccionarHexagonoLadron,
+  hexagonosResaltados = [],
 }: Props) {
 
   return (
@@ -138,7 +141,7 @@ function Tablero({
       {Object.entries(datos.hexagonos).map(([clave, hex]) => (
         <polygon
           key={clave}
-          className={`tbHex tbTerreno-${hex.terreno}`}
+          className={`tbHex tbTerreno-${hex.terreno}${hexagonosResaltados.includes(clave) ? ' tbHexProduce' : ''}`}
           points={esquinas(hex.h, hex.d).join(' ')}
         />
       ))}

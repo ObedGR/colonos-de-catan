@@ -40,6 +40,8 @@ import FinPartida from '../componentes/FinPartida';
 import ProponerIntercambio from '../componentes/ProponerIntercambio';
 import ResponderIntercambio, { type Respuesta } from '../componentes/ResponderIntercambio';
 import type { Propuesta } from '../common/partida';
+import { DURACION_ANIMACION_DADOS } from '../common/dados';
+import { DURACION_RESALTADO, lineasProduccion, type Produccion } from '../common/produccion';
 
 const recursosPrueba: Recursos = {
   madera: 2,
@@ -85,6 +87,12 @@ function Partida({ sala, onSolicitarConstruccion, onSalir }: Props) {
   const [objetivoConstruccion, setObjetivoConstruccion] = useState<ObjetivoConstruccion | null>(null);
   const [estadoConstruccion, setEstadoConstruccion] = useState('');
   const [resultadoDados, setResultadoDados] = useState<ResultadoDados | null>(null);
+  // Hexágonos que produjeron en la última tirada (se iluminan unos segundos).
+  const [hexagonosProductivos, setHexagonosProductivos] = useState<string[]>([]);
+  // true si esta pantalla pidió la tirada: solo quien tira ve la animación del dado.
+  const tiradaPropia = useRef(false);
+  // Se fija al llegar "dados": si el resumen de esa tirada debe esperar la animación.
+  const esperarAnimacion = useRef(false);
   const [lanzandoDados, setLanzandoDados] = useState(false);
   const [pasandoTurno, setPasandoTurno] = useState(false);
   const [descarteEnEspera, setDescarteEnEspera] = useState<number | null>(null);
@@ -271,6 +279,9 @@ function Partida({ sala, onSolicitarConstruccion, onSalir }: Props) {
     const dejarDeEscucharDados = sala.onMessage('dados', (resultado: ResultadoDados) => {
       setResultadoDados(resultado);
       setLanzandoDados(false);
+      // Cada tirada consume la marca: un 7 no trae "produccion" y no debe arrastrarla.
+      esperarAnimacion.current = tiradaPropia.current;
+      tiradaPropia.current = false;
     });
 
     // CatanRoom responde "error" al cliente si una validación falla. El
@@ -278,6 +289,7 @@ function Partida({ sala, onSolicitarConstruccion, onSalir }: Props) {
     // los botones para que la interfaz no quede bloqueada tras el rechazo.
     const dejarDeEscucharErrores = sala.onMessage('error', () => {
       setLanzandoDados(false);
+      tiradaPropia.current = false;
       setPasandoTurno(false);
       setDescarteEnEspera(null);
       setMoviendoLadron(false);
@@ -314,11 +326,30 @@ function Partida({ sala, onSolicitarConstruccion, onSalir }: Props) {
         agregar({ tipo: 'log', jugador, mensaje }),
     );
 
+    /* Resumen de la tirada: quién cobró qué. Quien tiró espera a que termine la
+       animación del dado para no adelantar el número; los demás ya lo ven. */
+    const temporizadores: ReturnType<typeof setTimeout>[] = [];
+    const dejarDeEscucharProduccion = sala.onMessage('produccion', (produccion: Produccion) => {
+      const espera = esperarAnimacion.current ? DURACION_ANIMACION_DADOS : 0;
+      esperarAnimacion.current = false;
+
+      temporizadores.push(setTimeout(() => {
+        const nombreDe = (id: string) => leerEstado(sala)?.jugadores[id]?.nombre ?? 'Un jugador';
+        lineasProduccion(produccion, nombreDe).forEach((mensaje) =>
+          agregar({ tipo: 'log', jugador: 'Sistema: ', mensaje }));
+
+        setHexagonosProductivos(produccion.productivos);
+        temporizadores.push(setTimeout(() => setHexagonosProductivos([]), DURACION_RESALTADO));
+      }, espera));
+    });
+
     return () => {
       dejarDeEscucharDados();
       dejarDeEscucharErrores();
       dejarDeEscucharChat();
       dejarDeEscucharLog();
+      dejarDeEscucharProduccion();
+      temporizadores.forEach(clearTimeout);
     };
   }, [sala]);
 
@@ -508,6 +539,7 @@ function Partida({ sala, onSolicitarConstruccion, onSalir }: Props) {
     // clic inválido en la interfaz y bloquea repeticiones mientras responde.
     if (!sala || !puedeLanzarDados || lanzandoDados) return;
     setLanzandoDados(true);
+    tiradaPropia.current = true;
     sala.send('msgLanzarDados');
   }
 
@@ -739,6 +771,7 @@ function Partida({ sala, onSolicitarConstruccion, onSalir }: Props) {
             onSeleccionarObjetivo={seleccionarObjetivo}
             moviendoLadron={(puedeMoverLadron && !moviendoLadron) || caballero === 'eligiendo'}
             onSeleccionarHexagonoLadron={seleccionarHexagonoLadron}
+            hexagonosResaltados={hexagonosProductivos}
           />
         </div>
         <div className="carRecursos">
