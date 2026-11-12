@@ -51,18 +51,24 @@ function FinPartida({ abierto, nombreGanador, soyElGanador, clasificacion, onSal
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {clasificacion.map(fila => (
-                                <TableRow key={fila.id} selected={fila.ganador}>
-                                    <TableCell>{fila.posicion}</TableCell>
-                                    <TableCell component="th" scope="row">{fila.nombre}</TableCell>
-                                    <TableCell align="right" sx={{ fontWeight: 'bold' }}>{fila.total}</TableCell>
-                                    <TableCell align="right">{fila.asentamientos}</TableCell>
-                                    <TableCell align="right">{fila.ciudades}</TableCell>
-                                    <TableCell align="right">{fila.caminoMasLargo}</TableCell>
-                                    <TableCell align="right">{fila.ejercitoMasGrande}</TableCell>
-                                    <TableCell align="right">{fila.cartasVictoria}</TableCell>
-                                </TableRow>
-                            ))}
+                            {clasificacion.map(fila => {
+                                const unidad = fila.cartasVictoria === 1 ? 'carta' : 'cartas';
+                                const cartas = `${fila.cartasVictoria} ${unidad}`;
+                                return (
+                                    <TableRow key={fila.id} selected={fila.ganador}>
+                                        <TableCell>{fila.posicion}</TableCell>
+                                        <TableCell component="th" scope="row">{fila.nombre}</TableCell>
+                                        <TableCell align="right" sx={{ fontWeight: 'bold' }}>{fila.total}</TableCell>
+                                        <TableCell align="right">{fila.asentamientos}</TableCell>
+                                        <TableCell align="right">{fila.ciudades}</TableCell>
+                                        <TableCell align="right">{fila.caminoMasLargo}</TableCell>
+                                        <TableCell align="right">{fila.ejercitoMasGrande}</TableCell>
+                                        <TableCell align="right" aria-label={`${fila.nombre} tenía ${cartas} de punto de victoria`}>
+                                            {cartas}
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })}
                         </TableBody>
                     </Table>
                 </TableContainer>
