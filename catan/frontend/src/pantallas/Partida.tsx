@@ -37,6 +37,7 @@ import UsarCarta, { type CartaUsable } from '../componentes/UsarCarta';
 import ElegirAbundancia from '../componentes/ElegirAbundancia';
 import ElegirMonopolio from '../componentes/ElegirMonopolio';
 import FinPartida from '../componentes/FinPartida';
+import { clasificacionFinal } from '../common/resultados';
 import ProponerIntercambio from '../componentes/ProponerIntercambio';
 import ResponderIntercambio, { type Respuesta } from '../componentes/ResponderIntercambio';
 import type { Propuesta } from '../common/partida';
@@ -744,6 +745,7 @@ function Partida({ sala, onSolicitarConstruccion, onSalir }: Props) {
           {partidaFinalizada && verTableroFinal && (
             <Alert
               severity="success"
+              action={<Button color="inherit" size="small" onClick={() => setVerTableroFinal(false)}>Ver resultados</Button>}
               sx={{ position: 'absolute', top: 8, left: '50%', transform: 'translateX(-50%)', zIndex: 1 }}
             >
               Partida finalizada: ganó <strong>{nombreGanador}</strong>. Usa "Salir" para dejar la sala.
@@ -904,6 +906,7 @@ function Partida({ sala, onSolicitarConstruccion, onSalir }: Props) {
           abierto={partidaFinalizada && !verTableroFinal}
           nombreGanador={nombreGanador}
           soyElGanador={partidaActual?.ganador === miSessionId}
+          clasificacion={estadoReal ? clasificacionFinal(estadoReal) : []}
           onSalir={() => onSalir?.()}
           onVerTablero={() => setVerTableroFinal(true)}
         />
