@@ -165,6 +165,9 @@ export class CatanRoom extends Room {
       //! Si sale 7 toda la logica cambia, entramos a fase de robo y/o ladron
       if (suma === 7) {
 
+        //* Tras mover el ladron por el 7 se sigue con las acciones del turno
+        this.partida.faseTrasRobo = FaseJuego.ACCIONES;
+
         //* Limpiar a los jugadors que deben descartar
         this.partida.jugadoresParaDescartar.clear();
 
@@ -723,7 +726,7 @@ export class CatanRoom extends Room {
 
       //* Si no hay jugadores pasamos a las acciones
       if (jugadoresinvolucrados.length === 0) {
-        this.partida.faseJuego = FaseJuego.ACCIONES;
+        this.partida.faseJuego = this.partida.faseTrasRobo;
         return;
       }
 
@@ -733,7 +736,7 @@ export class CatanRoom extends Room {
           this.jugadores.get(client.sessionId),
           this.jugadores.get(jugadoresinvolucrados[0])
         )
-        this.partida.faseJuego = FaseJuego.ACCIONES;
+        this.partida.faseJuego = this.partida.faseTrasRobo;
 
         //* Log del robo automatico
         this.broadcast("log", {
@@ -771,10 +774,11 @@ export class CatanRoom extends Room {
         return;
       }
 
-      //* Verificar si estamos en la fase de acciones
-      if (this.partida.faseJuego !== FaseJuego.ACCIONES) {
+      //* El caballero se puede jugar antes de tirar los dados o en la fase de acciones
+      const faseOrigen = this.partida.faseJuego;
+      if (faseOrigen !== FaseJuego.DADOS && faseOrigen !== FaseJuego.ACCIONES) {
         client.send("error", {
-          mensajeError: "Termina de lanzar los dados primero"
+          mensajeError: "Solo puedes jugar el caballero antes de tirar los dados o en la fase de acciones"
         })
         return;
       }
@@ -828,14 +832,17 @@ export class CatanRoom extends Room {
       verificarVictoria(this.partida, jugador, client.sessionId, this);
       
       //* Deshabilitar el uso de otra carta este turno
-      this.partida.cartaJugable = false;     
+      this.partida.cartaJugable = false;
+
+      //* Al terminar el robo se vuelve a la fase desde la que se jugo la carta
+      this.partida.faseTrasRobo = faseOrigen;
 
       //* Extraemos los jugadores involucrados en el robo
       const jugadoresInvolucrados = resultado.jugadoresInvolucrados;
 
-      //* Si no hay jugadores, pasamos a las ACCIONES
+      //* Si no hay jugadores, se vuelve a la fase de origen (dados o acciones)
       if (jugadoresInvolucrados.length == 0) {
-        this.partida.faseJuego = FaseJuego.ACCIONES;
+        this.partida.faseJuego = faseOrigen;
         return;
       }
 
@@ -845,7 +852,7 @@ export class CatanRoom extends Room {
           this.jugadores.get(client.sessionId),
           this.jugadores.get(jugadoresInvolucrados[0])
         )
-        this.partida.faseJuego = FaseJuego.ACCIONES;
+        this.partida.faseJuego = faseOrigen;
         return;
       }
 
@@ -1338,9 +1345,9 @@ export class CatanRoom extends Room {
         mensaje: ` ha robado un recurso a ${this.jugadores.get(mensaje.jugadorRobado)?.nombre}`
       })
 
-      //* Limpiar Lista y volver a acciones
+      //* Limpiar Lista y volver a la fase de origen (acciones, o dados si fue un caballero antes de tirar)
       this.partida.jugadoresParaRobar.clear();
-      this.partida.faseJuego = FaseJuego.ACCIONES;
+      this.partida.faseJuego = this.partida.faseTrasRobo;
     }
     
   };
@@ -1499,7 +1506,7 @@ export class CatanRoom extends Room {
   robarAlAzar() {
     const victimas = Array.from(this.partida.jugadoresParaRobar);
     if (victimas.length === 0) {
-      this.partida.faseJuego = FaseJuego.ACCIONES;
+      this.partida.faseJuego = this.partida.faseTrasRobo;
       return;
     }
     this.messages.msgRobarJugador(clienteSimulado(this.partida.turnoActual), {
