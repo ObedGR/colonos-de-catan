@@ -26,6 +26,9 @@ export class Partida extends Schema {
   @type("uint8") puntosParaGanar: number;
   @type("string") tablero: string;
   @type("boolean") comercioJugadores: boolean;
+  //* Fase a la que se vuelve al terminar de mover el ladron y robar:
+  //* DADOS si se jugo un caballero antes de tirar, ACCIONES en los demas casos
+  @type("uint8") faseTrasRobo: FaseJuego;
 
   constructor() {
     super();
@@ -46,5 +49,6 @@ export class Partida extends Schema {
     this.puntosParaGanar = 10;
     this.tablero = "aleatorio";
     this.comercioJugadores = true;
+    this.faseTrasRobo = FaseJuego.ACCIONES;
   }
 }
