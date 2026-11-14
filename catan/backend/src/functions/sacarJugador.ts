@@ -53,7 +53,7 @@ export function sacarJugador(
     if (indiceRobo !== -1){
         partida.jugadoresParaRobar.splice(indiceRobo, 1);
         if(partida.faseJuego === FaseJuego.ROBO && partida.jugadoresParaRobar.length === 0){
-            partida.faseJuego = FaseJuego.ACCIONES;
+            partida.faseJuego = partida.faseTrasRobo;
         }
     }
 

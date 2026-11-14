@@ -37,6 +37,7 @@ import UsarCarta, { type CartaUsable } from '../componentes/UsarCarta';
 import ElegirAbundancia from '../componentes/ElegirAbundancia';
 import ElegirMonopolio from '../componentes/ElegirMonopolio';
 import FinPartida from '../componentes/FinPartida';
+import { clasificacionFinal } from '../common/resultados';
 import ProponerIntercambio from '../componentes/ProponerIntercambio';
 import ResponderIntercambio, { type Respuesta } from '../componentes/ResponderIntercambio';
 import type { Propuesta } from '../common/partida';
@@ -204,7 +205,9 @@ function Partida({ sala, onSolicitarConstruccion, onSalir }: Props) {
         const usables = estado?.jugadores[salaActual.sessionId]?.cartas_usables[CARTA.CABALLERO] ?? 0;
         if (!estado || estado.partida.turnoActual !== salaActual.sessionId) return null;
         if (typeof anterior === 'number') return usables < anterior ? null : anterior;
-        return estado.partida.faseJuego === FASE_JUEGO.ACCIONES ? anterior : null;
+        // Mientras se elige el hexágono, la carta sigue valiendo antes de tirar o en acciones.
+        const faseJuego = estado.partida.faseJuego;
+        return faseJuego === FASE_JUEGO.ACCIONES || faseJuego === FASE_JUEGO.DADOS ? anterior : null;
       });
 
       // La propuesta se confirma cuando aparece en el estado como mia.
@@ -419,11 +422,14 @@ function Partida({ sala, onSolicitarConstruccion, onSalir }: Props) {
     cartasUsables[CARTA.CABALLERO] + cartasUsables[CARTA.CARRETERAS]
       + cartasUsables[CARTA.ABUNDANCIA] + cartasUsables[CARTA.MONOPOLIO] > 0
   ));
-  // El backend permite una carta por turno y solo en la fase de acciones.
+  /* Antes de tirar los dados solo se puede jugar el caballero (reglas
+     oficiales); el resto de cartas espera a la fase de acciones. */
+  const antesDeTirar = puedeLanzarDados && !lanzandoDados;
+  const tieneCaballero = (cartasUsables?.[CARTA.CABALLERO] ?? 0) > 0;
+  // El backend permite una carta por turno.
   const puedeUsarCarta = Boolean(
-    puedePasarTurno
+    ((puedePasarTurno && tieneCartaUsable) || (antesDeTirar && tieneCaballero))
       && partidaActual?.cartaJugable
-      && tieneCartaUsable
       && caballero === null
       && abundancia === null
       && monopolio === null
@@ -537,7 +543,8 @@ function Partida({ sala, onSolicitarConstruccion, onSalir }: Props) {
   function lanzarDados() {
     // El backend vuelve a validar turno y fase; esta condición solo evita un
     // clic inválido en la interfaz y bloquea repeticiones mientras responde.
-    if (!sala || !puedeLanzarDados || lanzandoDados) return;
+    // Mientras se usa un caballero antes de tirar, los dados esperan a que termine.
+    if (!sala || !puedeLanzarDados || lanzandoDados || caballero !== null) return;
     setLanzandoDados(true);
     tiradaPropia.current = true;
     sala.send('msgLanzarDados');
@@ -744,6 +751,7 @@ function Partida({ sala, onSolicitarConstruccion, onSalir }: Props) {
           {partidaFinalizada && verTableroFinal && (
             <Alert
               severity="success"
+              action={<Button color="inherit" size="small" onClick={() => setVerTableroFinal(false)}>Ver resultados</Button>}
               sx={{ position: 'absolute', top: 8, left: '50%', transform: 'translateX(-50%)', zIndex: 1 }}
             >
               Partida finalizada: ganó <strong>{nombreGanador}</strong>. Usa "Salir" para dejar la sala.
@@ -830,7 +838,7 @@ function Partida({ sala, onSolicitarConstruccion, onSalir }: Props) {
         <div className="tirDado">
           <TirarDados
             resultado={resultadoDados}
-            puedeLanzar={puedeLanzarDados}
+            puedeLanzar={puedeLanzarDados && caballero === null}
             lanzando={lanzandoDados}
             onLanzar={lanzarDados}
           />
@@ -878,6 +886,7 @@ function Partida({ sala, onSolicitarConstruccion, onSalir }: Props) {
         <UsarCarta
           abierto={menuCartasAbierto && puedeUsarCarta}
           cartasUsables={cartasUsables}
+          soloCaballero={antesDeTirar}
           onElegir={elegirCarta}
           onCerrar={() => setMenuCartasAbierto(false)}
         />
@@ -904,6 +913,7 @@ function Partida({ sala, onSolicitarConstruccion, onSalir }: Props) {
           abierto={partidaFinalizada && !verTableroFinal}
           nombreGanador={nombreGanador}
           soyElGanador={partidaActual?.ganador === miSessionId}
+          clasificacion={estadoReal ? clasificacionFinal(estadoReal) : []}
           onSalir={() => onSalir?.()}
           onVerTablero={() => setVerTableroFinal(true)}
         />

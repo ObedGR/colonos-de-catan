@@ -5,6 +5,9 @@ import { generarCartas } from "../generators/generarCartas.js";
 import { generarConstruccionesDisponibles } from "../generators/generarConstruccionesDisponibles.js";
 
 export class Jugador extends Schema {
+    @type("boolean") esBot = false;
+    //* Nivel del bot ("facil", "normal" o "dificil"); vacio en las personas
+    @type("string") dificultadBot = "";
     @type("string") nombre: string;
     @type("uint16") puntuacion: number;
     @type("uint16") puntosParaGanar: number;
