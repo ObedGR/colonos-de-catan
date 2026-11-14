@@ -72,6 +72,8 @@ export const NOMBRE_PIEZA: Record<string, string> = {
 
 export interface Jugador {
   esBot?: boolean;
+  // Nivel del bot ('facil', 'normal' o 'dificil'); vacío en las personas.
+  dificultadBot?: string;
   nombre: string;
   puntuacion: number;
   puntosParaGanar: number;
