@@ -5,6 +5,7 @@ import { OfertaIntercambio } from "./OfertaIntercambio.js";
 import { DURACION_TURNO } from "../functions/temporizador.js";
 
 export class Partida extends Schema {
+  @type("boolean") reemplazarConBots = false;
   @type("string") creador: string;
   @type("uint8") fase: FasePartida;
   @type("uint8") fasePreconstruccion: FasePreconstruccion;

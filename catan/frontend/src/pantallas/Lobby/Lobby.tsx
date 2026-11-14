@@ -38,6 +38,7 @@ export interface SalaDisponible {
 
 // Metadata que CatanRoom publica con setMetadata (ver onCreate en el backend).
 interface MetadataSala extends Partial<ConfiguracionPartida> {
+  bots?: number;
   alias?: string;
   estado?: string;
   privada?: boolean;
@@ -57,7 +58,7 @@ function salaDesdeListado(sala: RoomAvailable<MetadataSala>): SalaDisponible {
     id: sala.roomId,
     nombre: sala.metadata?.alias || "Catan Room",
     tipo: sala.metadata?.privada ? "privada" : "publica",
-    jugadores: sala.clients,
+    jugadores: sala.clients + (sala.metadata?.bots ?? 0),
     maxJugadores: sala.maxClients,
     anfitrion: sala.metadata?.anfitrion || "",
     configuracion: configuracionDesde(sala.metadata),
@@ -138,7 +139,8 @@ function Lobby({ onCrearSala, onUnirseASala, onVolver }: LobbyProps) {
 
   // Solo mostramos salas que todavía esperan jugadores.
   const salas: SalaDisponible[] = listado
-    .filter((sala) => sala.metadata?.estado === "EN LOBBY" && sala.clients < sala.maxClients)
+    .filter((sala) => sala.metadata?.estado === "EN LOBBY"
+      && sala.clients + (sala.metadata?.bots ?? 0) < sala.maxClients)
     .map(salaDesdeListado);
 
   function seleccionarSala(sala: SalaDisponible) {

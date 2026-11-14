@@ -33,7 +33,7 @@ function InfoJugadores({
           >
             <div className="d-flex align-items-center gap-1 min-w-0">
               <span className="flex-grow-1 text-truncate text-white fw-semibold">
-                {yo && '(Yo) '}{j.nombre}
+                {yo && '(Yo) '}{j.nombre}{j.esBot && <span aria-label="Bot"> 🤖</span>}
               </span>
               {id === caminoMasLargo && (
                 <span className="badge bg-light text-dark flex-shrink-0" title="Camino más largo (+2 puntos)">
