@@ -6,6 +6,8 @@ import { generarConstruccionesDisponibles } from "../generators/generarConstrucc
 
 export class Jugador extends Schema {
     @type("boolean") esBot = false;
+    //* Nivel del bot ("facil", "normal" o "dificil"); vacio en las personas
+    @type("string") dificultadBot = "";
     @type("string") nombre: string;
     @type("uint16") puntuacion: number;
     @type("uint16") puntosParaGanar: number;
