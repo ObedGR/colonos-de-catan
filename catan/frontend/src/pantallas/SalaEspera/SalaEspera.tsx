@@ -16,6 +16,7 @@ export interface JugadorVista {
   sessionId: string;
   nombre: string;
   score: number;
+  esBot: boolean;
   esUsuarioActual: boolean;
   esSuTurno: boolean;
 }
@@ -131,6 +132,11 @@ function SalaEspera({
                           {jugador.nombre}
                         </span>
                         {jugador.esUsuarioActual && <Chip label="Tú" color="info" size="small" />}
+                        {jugador.esBot && <Chip label="Bot" size="small" />}
+                        {esCreador && jugador.esBot && (
+                          <Button size="small" onClick={() => room.send("msgQuitarBot", { jugador: jugador.sessionId })}
+                            aria-label={`Quitar a ${jugador.nombre}`}>Quitar</Button>
+                        )}
                       </CardContent>
                     </Card>
                   </li>
@@ -193,6 +199,10 @@ function SalaEspera({
 
           {esCreador ? (
             <>
+              <Button variant="outlined" className="mb-2" disabled={jugadores.length >= maxJugadores}
+                onClick={() => room.send("msgAgregarBot")}>
+                Agregar bot
+              </Button>
               <Button
                 variant="contained"
                 color="success"

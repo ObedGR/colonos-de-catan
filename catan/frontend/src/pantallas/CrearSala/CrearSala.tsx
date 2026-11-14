@@ -264,6 +264,14 @@ function CrearSala({ nombreJugador, onCrear, onVolver }: CrearSalaProps) {
                   slotProps={{ input: { "aria-labelledby": "regla-comercio" } }}
                 />
               </FilaRegla>
+              <FilaRegla id="regla-bots" titulo="Reemplazar abandonos con bots"
+                ayuda="Un bot conserva el asiento y las piezas si un jugador abandona la partida.">
+                <Switch
+                  checked={configuracion.reemplazarConBots}
+                  onChange={e => setConfiguracion(c => ({ ...c, reemplazarConBots: e.target.checked }))}
+                  slotProps={{ input: { "aria-labelledby": "regla-bots" } }}
+                />
+              </FilaRegla>
             </section>
 
             {errorServidor && (

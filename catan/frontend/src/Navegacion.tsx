@@ -31,6 +31,7 @@ const MAX_JUGADORES = 4;
 const MIN_JUGADORES = 2;
 
 interface JugadorEstado {
+  esBot?: boolean;
   nombre: string;
   puntuacion: number;
 }
@@ -158,6 +159,7 @@ function Navegacion() {
           sessionId,
           nombre: jugador.nombre,
           score: jugador.puntuacion,
+          esBot: jugador.esBot === true,
           esUsuarioActual,
           esSuTurno: sessionId === state.partida.turnoActual,
         });
