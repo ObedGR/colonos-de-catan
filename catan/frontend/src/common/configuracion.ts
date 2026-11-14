@@ -12,6 +12,7 @@ export interface ConfiguracionPartida {
   // Segundos por fase; 0 = sin límite.
   duracionTurno: number;
   comercioJugadores: boolean;
+  reemplazarConBots: boolean;
 }
 
 export const CONFIGURACION_POR_DEFECTO: ConfiguracionPartida = {
@@ -19,6 +20,7 @@ export const CONFIGURACION_POR_DEFECTO: ConfiguracionPartida = {
   tablero: 'aleatorio',
   duracionTurno: 90,
   comercioJugadores: true,
+  reemplazarConBots: false,
 };
 
 export const OPCIONES_PUNTOS = [8, 10, 12];
@@ -51,5 +53,6 @@ export function configuracionDesde(datos: Partial<ConfiguracionPartida> | undefi
     tablero: datos?.tablero ?? CONFIGURACION_POR_DEFECTO.tablero,
     duracionTurno: datos?.duracionTurno ?? CONFIGURACION_POR_DEFECTO.duracionTurno,
     comercioJugadores: datos?.comercioJugadores ?? CONFIGURACION_POR_DEFECTO.comercioJugadores,
+    reemplazarConBots: datos?.reemplazarConBots ?? CONFIGURACION_POR_DEFECTO.reemplazarConBots,
   };
 }

@@ -45,9 +45,39 @@ export class CatanRoom extends Room {
   //* Temporizador de turno: fase que se esta cronometrando y cuando vence (ms)
   faseCronometrada = "";
   venceFase = 0;
+  private siguienteBot = 0;
+  private faseBot = "";
+  private numeroBot = 0;
 
 
   messages = {
+    msgAgregarBot: (client: Client) => {
+      if (this.partida.fase !== FasePartida.LOBBY || client.sessionId !== this.partida.creador
+          || this.jugadores.size >= this.maxClients) {
+        client.send("error", { mensajeError: "Solo el anfitrión puede agregar bots si hay cupo en la sala de espera" });
+        return;
+      }
+      const numero = ++this.numeroBot;
+      const id = "bot-" + numero;
+      const bot = new Jugador("Bot " + numero);
+      bot.esBot = true;
+      bot.puntosParaGanar = this.partida.puntosParaGanar;
+      this.jugadores.set(id, bot);
+      this.partida.ordenJugadores.push(id);
+      this.actualizarCuposBots();
+    },
+
+    msgQuitarBot: (client: Client, mensaje: { jugador: string }) => {
+      const id = mensaje?.jugador;
+      if (this.partida.fase !== FasePartida.LOBBY || client.sessionId !== this.partida.creador
+          || !this.jugadores.get(id)?.esBot) {
+        client.send("error", { mensajeError: "Solo el anfitrión puede quitar bots en la sala de espera" });
+        return;
+      }
+      this.jugadores.delete(id);
+      this.partida.ordenJugadores.splice(this.partida.ordenJugadores.indexOf(id), 1);
+      this.actualizarCuposBots();
+    },
 
     msgChat: (
       client: Client, 
@@ -890,6 +920,9 @@ export class CatanRoom extends Room {
 
       partida.ofertaIntercambio.setOferta(client.sessionId, this.jugadores, mensaje);
       this.broadcast("log", { jugador: jugador.nombre, mensaje: " ha hecho una oferta de intercambio" });
+      for (const [id, participante] of this.jugadores) {
+        if (participante.esBot) this.responderOfertaBot(id);
+      }
     },
 
     msgResponderIntercambio: (
@@ -1382,10 +1415,96 @@ export class CatanRoom extends Room {
   }
 
   //* Lleva la cuenta regresiva de la fase en curso y la resuelve si se acaba el tiempo
+  private actualizarCuposBots() {
+    const bots = [...this.jugadores.values()].filter(jugador => jugador.esBot).length;
+    void this.setMetadata({ ...this.metadata, bots });
+  }
+
+  protected responderOfertaBot(id: string) {
+    const oferta = this.partida.ofertaIntercambio;
+    if (oferta.respuestas.get(id) === 0) {
+      this.messages.msgResponderIntercambio(clienteSimulado(id), { ofertaId: oferta.id, respuesta: -1 });
+    }
+  }
+
+  revisarBots(ahora = Date.now()) {
+    const { partida } = this;
+    const enJuego = partida.fase === FasePartida.JUEGO;
+    const enPreparacion = partida.fase === FasePartida.PRECONSTRUCCION;
+    const descarte = enJuego && partida.faseJuego === FaseJuego.DESCARTE;
+    const id = descarte
+      ? [...partida.jugadoresParaDescartar.keys()].find(id => this.jugadores.get(id)?.esBot)
+      : partida.turnoActual;
+    if ((!enJuego && !enPreparacion) || !id || !this.jugadores.get(id)?.esBot) {
+      this.faseBot = "";
+      return;
+    }
+    const clave = claveFase(partida) + "|" + id;
+    if (clave !== this.faseBot) {
+      this.faseBot = clave;
+      this.siguienteBot = ahora + 1500;
+    }
+    if (ahora < this.siguienteBot) return;
+    this.siguienteBot = ahora + 1500;
+    this.jugarAccionBot(id);
+    // El siguiente plazo empieza cuando cambia la fase, sin sumar dos esperas.
+    this.faseBot = claveFase(partida) + "|" + id;
+  }
+
+  protected jugarAccionBot(id: string) {
+    const cliente = clienteSimulado(id);
+    if (this.partida.fase === FasePartida.PRECONSTRUCCION) {
+      if (this.partida.fasePreconstruccion === FasePreconstruccion.ASENTAMIENTO) {
+        this.colocarAlAzar("msgColocarAsentamiento", [...this.tablero.vertices.keys()]);
+      } else {
+        this.colocarAlAzar("msgColocarCamino", [...this.tablero.aristas.keys()]);
+      }
+      return;
+    }
+    switch (this.partida.faseJuego) {
+      case FaseJuego.DADOS: this.messages.msgLanzarDados(cliente); break;
+      case FaseJuego.ACCIONES:
+        if (!this.construirBot(id)) this.messages.msgPasarTurno(cliente);
+        break;
+      case FaseJuego.DESCARTE: {
+        const recurso = cartaAlAzar(this.jugadores.get(id));
+        if (recurso) this.messages.msgDescartarRecursos(cliente, { recurso });
+        break;
+      }
+      case FaseJuego.LADRON: this.moverLadronAlAzar(); break;
+      case FaseJuego.ROBO: this.robarAlAzar(); break;
+      case FaseJuego.CARRETERAS:
+        this.partida.carreterasGratis = 0;
+        this.partida.faseJuego = FaseJuego.ACCIONES;
+        this.messages.msgPasarTurno(cliente);
+        break;
+    }
+  }
+
+  protected construirBot(id: string) {
+    let error = false;
+    const cliente = clienteSimulado(id);
+    cliente.send = () => { error = true; };
+    for (const [mensaje, posiciones] of [
+      ["msgColocarCiudad", [...this.tablero.vertices.values()]],
+      ["msgColocarAsentamiento", [...this.tablero.vertices.values()]],
+      ["msgColocarCamino", [...this.tablero.aristas.values()]],
+    ] as const) {
+      for (const { h, d, p } of mezclar(posiciones)) {
+        error = false;
+        this.messages[mensaje](cliente, { h, d, p });
+        if (!error) return true;
+      }
+    }
+    return false;
+  }
+
   revisarTemporizador() {
     //* Solo hay temporizador durante la colocacion inicial y el juego, y si la sala tiene limite
     const enJuego = this.partida.fase === FasePartida.PRECONSTRUCCION || this.partida.fase === FasePartida.JUEGO;
-    if (!enJuego || this.partida.duracionTurno === 0) {
+    const turnoBot = this.jugadores.get(this.partida.turnoActual)?.esBot
+      && (this.partida.fase !== FasePartida.JUEGO || this.partida.faseJuego !== FaseJuego.DESCARTE);
+    if (!enJuego || turnoBot || this.partida.duracionTurno === 0) {
       this.faseCronometrada = "";
       this.partida.tiempoRestante = 0;
       return;
@@ -1544,7 +1663,10 @@ export class CatanRoom extends Room {
     console.log("room created!", this.roomId);
 
     //* El reloj de la sala se detiene solo cuando la sala se cierra
-    this.clock.setInterval(() => this.revisarTemporizador(), INTERVALO_TEMPORIZADOR);
+    this.clock.setInterval(() => {
+      this.revisarBots();
+      this.revisarTemporizador();
+    }, INTERVALO_TEMPORIZADOR);
     //* si se ingresa codigo de acceso, se setea al atributo de codigo de acceso a la sala
     this.codigoAcceso = options.codigoAcceso || ""
 
@@ -1554,6 +1676,7 @@ export class CatanRoom extends Room {
     this.partida.tablero = configuracion.tablero;
     this.partida.duracionTurno = configuracion.duracionTurno;
     this.partida.comercioJugadores = configuracion.comercioJugadores;
+    this.partida.reemplazarConBots = configuracion.reemplazarConBots;
 
     if (configuracion.tablero === "principiante") {
       generarTableroPrincipiante(this.tablero.hexagonos, this.tablero.ladron);
@@ -1575,6 +1698,7 @@ export class CatanRoom extends Room {
     if(this.partida.fase !== FasePartida.LOBBY){
       throw new Error("La partida ya ha comenzado, no puedes unirte");
     }
+    if (this.jugadores.size >= this.maxClients) throw new Error("La sala está llena");
     if (this.codigoAcceso !== "") {
       if (options.codigoAcceso !== this.codigoAcceso) {
         throw new Error("Código de acceso incorrecto");
@@ -1611,7 +1735,7 @@ export class CatanRoom extends Room {
 
       //* Si se fue el creador, el siguiente en entrar pasa a ser el anfitrión
       if (this.partida.creador === client.sessionId) {
-        this.partida.creador = this.partida.ordenJugadores[0] ?? "";
+        this.partida.creador = this.partida.ordenJugadores.find(id => !this.jugadores.get(id)?.esBot) ?? "";
         this.setMetadata({
           ...this.metadata,
           anfitrion: this.jugadores.get(this.partida.creador)?.nombre ?? ""
@@ -1622,6 +1746,14 @@ export class CatanRoom extends Room {
 
     //* Si ya se estaba jugando se debe eliminar completamente
     if([FasePartida.JUEGO, FasePartida.PRECONSTRUCCION].includes(this.partida.fase)){
+      const jugador = this.jugadores.get(client.sessionId);
+      if (this.partida.reemplazarConBots && jugador && !jugador.esBot) {
+        this.broadcast("log", { jugador: "Sistema: ", mensaje: jugador.nombre + " abandonó la partida: un bot ocupa su lugar" });
+        jugador.esBot = true;
+        jugador.nombre = "Bot " + jugador.nombre;
+        this.responderOfertaBot(client.sessionId);
+        return;
+      }
       //* Ver si era el creador de la sala
       const eraCreador = this.partida.creador === client.sessionId;
       
