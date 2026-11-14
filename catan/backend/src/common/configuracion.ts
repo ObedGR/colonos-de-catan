@@ -10,6 +10,7 @@ export interface ConfiguracionPartida {
     tablero: string;
     duracionTurno: number;
     comercioJugadores: boolean;
+    reemplazarConBots: boolean;
 }
 
 //* Lee las opciones que manda el cliente. Cualquier valor no permitido se
@@ -24,5 +25,6 @@ export function leerConfiguracion(options: any): ConfiguracionPartida {
         //* Sin eleccion se usa DURACION_TURNO (90, o lo que diga la variable de entorno)
         duracionTurno: DURACIONES_PERMITIDAS.includes(duracion) ? duracion : DURACION_TURNO,
         comercioJugadores: options?.comercioJugadores !== false,
+        reemplazarConBots: options?.reemplazarConBots === true,
     };
 }

@@ -71,6 +71,9 @@ export const NOMBRE_PIEZA: Record<string, string> = {
    unico que el backend NO manda es el color: se calcula abajo. */
 
 export interface Jugador {
+  esBot?: boolean;
+  // Nivel del bot ('facil', 'normal' o 'dificil'); vacío en las personas.
+  dificultadBot?: string;
   nombre: string;
   puntuacion: number;
   puntosParaGanar: number;

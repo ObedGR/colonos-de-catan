@@ -5,6 +5,7 @@ import { OfertaIntercambio } from "./OfertaIntercambio.js";
 import { DURACION_TURNO } from "../functions/temporizador.js";
 
 export class Partida extends Schema {
+  @type("boolean") reemplazarConBots = false;
   @type("string") creador: string;
   @type("uint8") fase: FasePartida;
   @type("uint8") fasePreconstruccion: FasePreconstruccion;
@@ -26,6 +27,9 @@ export class Partida extends Schema {
   @type("uint8") puntosParaGanar: number;
   @type("string") tablero: string;
   @type("boolean") comercioJugadores: boolean;
+  //* Fase a la que se vuelve al terminar de mover el ladron y robar:
+  //* DADOS si se jugo un caballero antes de tirar, ACCIONES en los demas casos
+  @type("uint8") faseTrasRobo: FaseJuego;
 
   constructor() {
     super();
@@ -46,5 +50,6 @@ export class Partida extends Schema {
     this.puntosParaGanar = 10;
     this.tablero = "aleatorio";
     this.comercioJugadores = true;
+    this.faseTrasRobo = FaseJuego.ACCIONES;
   }
 }

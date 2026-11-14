@@ -21,13 +21,15 @@ const CARTAS_IMPLEMENTADAS: CartaUsable[] = [CARTA.CABALLERO, CARTA.CARRETERAS, 
 interface Props {
     abierto: boolean;
     cartasUsables?: Cartas;
+    // Antes de tirar los dados solo se puede jugar el caballero.
+    soloCaballero?: boolean;
     onElegir: (carta: CartaUsable) => void;
     onCerrar: () => void;
 }
 
 //* Menu comun para elegir que carta de desarrollo usar (una por turno)
 
-function UsarCarta({ abierto, cartasUsables, onElegir, onCerrar }: Props) {
+function UsarCarta({ abierto, cartasUsables, soloCaballero = false, onElegir, onCerrar }: Props) {
     return (
         <Dialog open={abierto} onClose={onCerrar} fullWidth maxWidth="xs" aria-labelledby="usar-carta-titulo">
             {/*Titulo del modal*/}
@@ -36,24 +38,29 @@ function UsarCarta({ abierto, cartasUsables, onElegir, onCerrar }: Props) {
             {/*Cuerpo del modal*/}
             <DialogContent>
                 <Typography color="text.secondary">
-                    Solo puedes usar una carta por turno.
+                    {soloCaballero
+                        ? 'Antes de tirar los dados solo puedes usar el caballero. Solo una carta por turno.'
+                        : 'Solo puedes usar una carta por turno.'}
                 </Typography>
                 <Stack spacing={1} sx={{ mt: 2 }}>
                     {CARTAS_USABLES.map(({ clave, icono, efecto }) => {
                         const cantidad = cartasUsables?.[clave] ?? 0;
                         const implementada = CARTAS_IMPLEMENTADAS.includes(clave);
+                        const esperaDados = soloCaballero && clave !== CARTA.CABALLERO;
                         return (
                             <Button
                                 key={clave}
                                 variant="outlined"
-                                disabled={cantidad < 1 || !implementada}
+                                disabled={cantidad < 1 || !implementada || esperaDados}
                                 onClick={() => onElegir(clave)}
                                 sx={{ justifyContent: 'flex-start', textTransform: 'none', gap: 1.5 }}
                             >
                                 <img src={icono} alt="" aria-hidden="true" width={32} height={32} />
                                 <span className="d-flex flex-column align-items-start flex-grow-1 text-start">
                                     <span className="fw-bold">{NOMBRE_CARTA[clave]} ({cantidad})</span>
-                                    <small>{implementada ? efecto : 'Pendiente'}</small>
+                                    <small>
+                                        {!implementada ? 'Pendiente' : esperaDados ? 'Disponible después de tirar los dados.' : efecto}
+                                    </small>
                                 </span>
                             </Button>
                         );

@@ -7,15 +7,27 @@ import Button from "@mui/material/Button";
 import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
 import Chip from "@mui/material/Chip";
+import ToggleButton from "@mui/material/ToggleButton";
+import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Typography from "@mui/material/Typography";
 import { COLORES } from "../../common/jugador";
 import type { InfoSala } from "../sesionGuardada";
 import { resumenConfiguracion, type ConfiguracionPartida } from "../../common/configuracion";
+import {
+  DIFICULTADES_BOT,
+  DIFICULTAD_POR_DEFECTO,
+  NOMBRE_DIFICULTAD,
+  nombreDificultad,
+  type DificultadBot,
+} from "../../common/bots";
 
 export interface JugadorVista {
   sessionId: string;
   nombre: string;
   score: number;
+  esBot: boolean;
+  // Nivel del bot; vacío en las personas.
+  dificultadBot: string;
   esUsuarioActual: boolean;
   esSuTurno: boolean;
 }
@@ -53,6 +65,8 @@ function SalaEspera({
   onSalir,
 }: SalaEsperaProps) {
   const [copiado, setCopiado] = useState<Copiado>(null);
+  // Dificultad con la que se agrega el próximo bot.
+  const [dificultadNueva, setDificultadNueva] = useState<DificultadBot>(DIFICULTAD_POR_DEFECTO);
   const temporizador = useRef<ReturnType<typeof setTimeout> | null>(null);
   const puedeIniciar = jugadores.length >= minJugadores;
 
@@ -131,6 +145,11 @@ function SalaEspera({
                           {jugador.nombre}
                         </span>
                         {jugador.esUsuarioActual && <Chip label="Tú" color="info" size="small" />}
+                        {jugador.esBot && <Chip label={`🤖 ${nombreDificultad(jugador.dificultadBot)}`} size="small" />}
+                        {esCreador && jugador.esBot && (
+                          <Button size="small" onClick={() => room.send("msgQuitarBot", { jugador: jugador.sessionId })}
+                            aria-label={`Quitar a ${jugador.nombre}`}>Quitar</Button>
+                        )}
                       </CardContent>
                     </Card>
                   </li>
@@ -193,6 +212,26 @@ function SalaEspera({
 
           {esCreador ? (
             <>
+              <div className="d-flex flex-wrap align-items-center justify-content-center gap-2 mb-2">
+                <ToggleButtonGroup
+                  exclusive
+                  size="small"
+                  color="primary"
+                  value={dificultadNueva}
+                  // El grupo manda null al volver a pulsar la opción elegida: se ignora.
+                  onChange={(_, valor: DificultadBot | null) => valor && setDificultadNueva(valor)}
+                  aria-label="Dificultad del bot"
+                  sx={{ "& .MuiToggleButton-root": { textTransform: "none" } }}
+                >
+                  {DIFICULTADES_BOT.map((dificultad) => (
+                    <ToggleButton key={dificultad} value={dificultad}>{NOMBRE_DIFICULTAD[dificultad]}</ToggleButton>
+                  ))}
+                </ToggleButtonGroup>
+                <Button variant="outlined" disabled={jugadores.length >= maxJugadores}
+                  onClick={() => room.send("msgAgregarBot", { dificultad: dificultadNueva })}>
+                  🤖 Agregar bot
+                </Button>
+              </div>
               <Button
                 variant="contained"
                 color="success"
