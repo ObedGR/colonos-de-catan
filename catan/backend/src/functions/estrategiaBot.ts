@@ -5,12 +5,33 @@ import { Tablero } from "../schemas/Tablero.js";
 import { Jugador } from "../schemas/Jugador.js";
 import { extremosArista } from "./caminoMasLargo.js";
 import { verticesDelHexagono } from "./verticesDelHexagono.js";
+import { mezclar } from "../common/mezclar.js";
 
 //* Decisiones de los bots. Son funciones puras: leen el estado y devuelven
 //* que conviene hacer; quien juega la accion es CatanRoom, con los mismos
 //* handlers que usan las personas, asi que las reglas se validan alla.
 
 export const RECURSOS = ["madera", "ladrillo", "lana", "trigo", "mineral"];
+
+//* Niveles de los bots: facil juega al azar, normal con estrategia imperfecta, dificil con la completa
+export const DIFICULTADES_BOT = ["facil", "normal", "dificil"] as const;
+export type DificultadBot = typeof DIFICULTADES_BOT[number];
+export const DIFICULTAD_POR_DEFECTO: DificultadBot = "normal";
+
+export function esDificultadValida(valor: unknown): valor is DificultadBot {
+    return DIFICULTADES_BOT.includes(valor as DificultadBot);
+}
+
+//* Orden en que el bot prueba sus opciones (ya ordenadas de la mejor a la peor):
+//* - dificil: siempre la mejor.
+//* - normal: a veces la segunda o tercera mejor (se mezclan las tres primeras).
+//* - facil: cualquiera de las validas, al azar.
+export function ordenarSegunDificultad<T>(lista: T[], dificultad: DificultadBot): T[] {
+    if (lista.length < 2) return lista;
+    if (dificultad === "facil") return mezclar([...lista]);
+    if (dificultad === "normal") return [...mezclar(lista.slice(0, 3)), ...lista.slice(3)];
+    return lista;
+}
 
 export type TipoObjetivo = "ciudad" | "asentamiento" | "carta" | "camino";
 
@@ -269,6 +290,22 @@ export function elegirHexagonoLadron(
     });
 
     return { h: mejor.h, d: mejor.d };
+}
+
+//* Ladron del nivel normal: cualquier hexagono que no toque construcciones propias
+//* (sin buscar al que va ganando)
+export function hexagonoLadronSinCriterio(tablero: Tablero, id: string): { h: number, d: number } {
+    const opciones = [...tablero.hexagonos.values()].filter((hexagono) =>
+        (hexagono.h !== tablero.ladron.h || hexagono.d !== tablero.ladron.d)
+        && verticesDelHexagono(tablero.vertices, hexagono).every((vertice) => vertice.propietario !== id));
+    const elegido = opciones[Math.floor(Math.random() * opciones.length)];
+    return elegido ? { h: elegido.h, d: elegido.d } : elegirHexagonoLadronCualquiera(tablero);
+}
+
+function elegirHexagonoLadronCualquiera(tablero: Tablero): { h: number, d: number } {
+    const otro = [...tablero.hexagonos.values()].find((hexagono) =>
+        hexagono.h !== tablero.ladron.h || hexagono.d !== tablero.ladron.d);
+    return { h: otro.h, d: otro.d };
 }
 
 //* A quien robarle: al que va ganando; ante empate, al que tiene mas cartas

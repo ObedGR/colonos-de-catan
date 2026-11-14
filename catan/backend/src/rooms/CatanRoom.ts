@@ -32,9 +32,11 @@ import { leerConfiguracion } from "../common/configuracion.js";
 import { generarTableroPrincipiante } from "../generators/generarTableroPrincipiante.js";
 import { obtenerTasaDeComercio } from "../functions/comerciarBanca.js";
 import {
-  COSTOS, aceptaOferta, asentamientosPropios, caminosCandidatos, construirGrafo, elegirAbundancia,
-  elegirDescarte, elegirHexagonoLadron, elegirIntercambioBanca, elegirMonopolio, elegirObjetivo,
-  elegirVictima, ladronBloqueaAlBot, lugaresAsentamiento, puedePagar, sobrante, verticesIniciales
+  COSTOS, DIFICULTAD_POR_DEFECTO, aceptaOferta, asentamientosPropios, caminosCandidatos, construirGrafo,
+  elegirAbundancia, elegirDescarte, elegirHexagonoLadron, elegirIntercambioBanca, elegirMonopolio,
+  elegirObjetivo, elegirVictima, esDificultadValida, hexagonoLadronSinCriterio, ladronBloqueaAlBot,
+  lugaresAsentamiento, ordenarSegunDificultad, puedePagar, sobrante, verticesIniciales,
+  type DificultadBot
 } from "../functions/estrategiaBot.js";
 
 //* "h,d,p" -> { h, d, p } para los handlers de construccion
@@ -63,16 +65,23 @@ export class CatanRoom extends Room {
 
 
   messages = {
-    msgAgregarBot: (client: Client) => {
+    msgAgregarBot: (client: Client, mensaje?: { dificultad?: string }) => {
       if (this.partida.fase !== FasePartida.LOBBY || client.sessionId !== this.partida.creador
           || this.jugadores.size >= this.maxClients) {
         client.send("error", { mensajeError: "Solo el anfitrión puede agregar bots si hay cupo en la sala de espera" });
+        return;
+      }
+      //* Sin dificultad elegida se usa la normal; un valor desconocido se rechaza
+      const dificultad = mensaje?.dificultad ?? DIFICULTAD_POR_DEFECTO;
+      if (!esDificultadValida(dificultad)) {
+        client.send("error", { mensajeError: "Dificultad de bot no válida" });
         return;
       }
       const numero = ++this.numeroBot;
       const id = "bot-" + numero;
       const bot = new Jugador("Bot " + numero);
       bot.esBot = true;
+      bot.dificultadBot = dificultad;
       bot.puntosParaGanar = this.partida.puntosParaGanar;
       this.jugadores.set(id, bot);
       this.partida.ordenJugadores.push(id);
@@ -1439,8 +1448,10 @@ export class CatanRoom extends Room {
 
     const jugador = this.jugadores.get(id);
     const objetivo = elegirObjetivo(this.tablero, construirGrafo(this.tablero), jugador, id);
-    //* Quien propone ofrece lo que el bot recibe y pide lo que el bot entrega
-    const acepta = aceptaOferta(jugador, objetivo.costo, new Map(oferta.ofrece), new Map(oferta.pide));
+    //* Quien propone ofrece lo que el bot recibe y pide lo que el bot entrega.
+    //* El bot facil no comercia: rechaza todo.
+    const acepta = this.dificultadDe(id) !== "facil"
+      && aceptaOferta(jugador, objetivo.costo, new Map(oferta.ofrece), new Map(oferta.pide));
     const respondio = acepta && this.intentarBot(id, (c) =>
       this.messages.msgResponderIntercambio(c, { ofertaId: oferta.id, respuesta: 1 }));
     if (!respondio) {
@@ -1472,18 +1483,26 @@ export class CatanRoom extends Room {
     this.faseBot = claveFase(partida) + "|" + id;
   }
 
+  //* Nivel de un bot; los bots creados antes de existir la dificultad juegan en normal
+  protected dificultadDe(id: string): DificultadBot {
+    const dificultad = this.jugadores.get(id)?.dificultadBot;
+    return esDificultadValida(dificultad) ? dificultad : DIFICULTAD_POR_DEFECTO;
+  }
+
   protected jugarAccionBot(id: string) {
+    const dificultad = this.dificultadDe(id);
     const cliente = clienteSimulado(id);
     const jugador = this.jugadores.get(id);
     const grafo = construirGrafo(this.tablero);
+    const ordenar = <T>(lista: T[]) => ordenarSegunDificultad(lista, dificultad);
 
     if (this.partida.fase === FasePartida.PRECONSTRUCCION) {
       if (this.partida.fasePreconstruccion === FasePreconstruccion.ASENTAMIENTO) {
-        this.colocarEnOrden("msgColocarAsentamiento", verticesIniciales(this.tablero, grafo));
+        this.colocarEnOrden("msgColocarAsentamiento", ordenar(verticesIniciales(this.tablero, grafo)));
       } else {
         //* El camino apunta al mejor lugar libre cercano (el handler exige que toque el ultimo asentamiento)
         const caminos = caminosCandidatos(this.tablero, grafo, id).map(({ clave }) => clave);
-        this.colocarEnOrden("msgColocarCamino", caminos);
+        this.colocarEnOrden("msgColocarCamino", ordenar(caminos));
       }
       return;
     }
@@ -1498,17 +1517,26 @@ export class CatanRoom extends Room {
         if (!this.construirBot(id)) this.messages.msgPasarTurno(cliente);
         break;
       case FaseJuego.DESCARTE: {
-        const recurso = elegirDescarte(jugador, objetivo.costo);
+        //* El bot facil descarta cualquier carta
+        const recurso = dificultad === "facil"
+          ? cartaAlAzar(jugador)
+          : elegirDescarte(jugador, objetivo.costo);
         if (recurso) this.messages.msgDescartarRecursos(cliente, { recurso });
         break;
       }
       case FaseJuego.LADRON:
-        this.messages.msgMoverLadron(cliente, elegirHexagonoLadron(this.tablero, this.jugadores, id));
+        //* Dificil busca al que va ganando; normal solo evita sus hexagonos; facil lo pone en cualquiera
+        if (dificultad === "facil") this.moverLadronAlAzar();
+        else this.messages.msgMoverLadron(cliente, dificultad === "dificil"
+          ? elegirHexagonoLadron(this.tablero, this.jugadores, id)
+          : hexagonoLadronSinCriterio(this.tablero, id));
         break;
       case FaseJuego.ROBO: {
         const victimas = Array.from(this.partida.jugadoresParaRobar);
         if (victimas.length === 0) this.robarAlAzar();
-        else this.messages.msgRobarJugador(cliente, { jugadorRobado: elegirVictima(victimas, this.jugadores) });
+        else this.messages.msgRobarJugador(cliente, {
+          jugadorRobado: dificultad === "dificil" ? elegirVictima(victimas, this.jugadores) : alAzar(victimas)
+        });
         break;
       }
       case FaseJuego.CARRETERAS: {
@@ -1545,6 +1573,8 @@ export class CatanRoom extends Room {
   //* Devuelve false cuando no queda nada que hacer y el bot debe pasar el turno.
   protected construirBot(id: string) {
     const jugador = this.jugadores.get(id);
+    const dificultad = this.dificultadDe(id);
+    const ordenar = <T>(lista: T[]) => ordenarSegunDificultad(lista, dificultad);
     const grafo = construirGrafo(this.tablero);
     const objetivo = elegirObjetivo(this.tablero, grafo, jugador, id);
     const usable = (carta: Desarrollo) =>
@@ -1553,17 +1583,17 @@ export class CatanRoom extends Room {
     if (this.jugarCaballeroBot(id)) return true;
 
     //* Construir en el mejor lugar: ciudad, luego asentamiento
-    for (const clave of asentamientosPropios(this.tablero, id)) {
+    for (const clave of ordenar(asentamientosPropios(this.tablero, id))) {
       if (!puedePagar(jugador.recursos, COSTOS.ciudad)) break;
       if (this.intentarBot(id, (c) => this.messages.msgColocarCiudad(c, clavePosicion(clave)))) return true;
     }
-    for (const clave of lugaresAsentamiento(this.tablero, grafo, id)) {
+    for (const clave of ordenar(lugaresAsentamiento(this.tablero, grafo, id))) {
       if (!puedePagar(jugador.recursos, COSTOS.asentamiento)) break;
       if (this.intentarBot(id, (c) => this.messages.msgColocarAsentamiento(c, clavePosicion(clave)))) return true;
     }
 
     //* Caminos solo hacia buenos lugares y sin gastar lo que necesita un asentamiento posible
-    const caminos = caminosCandidatos(this.tablero, grafo, id).filter(({ valor }) => valor > 0);
+    const caminos = ordenar(caminosCandidatos(this.tablero, grafo, id).filter(({ valor }) => valor > 0));
     if (objetivo.tipo !== "asentamiento" && puedePagar(jugador.recursos, COSTOS.camino)) {
       for (const { clave } of caminos) {
         if (this.intentarBot(id, (c) => this.messages.msgColocarCamino(c, clavePosicion(clave)))) return true;
@@ -1588,7 +1618,9 @@ export class CatanRoom extends Room {
     if (usable(Desarrollo.CARRETERA) && caminos.length > 0
         && this.intentarBot(id, (c) => this.messages.msgCartaCarreteras(c))) return true;
 
-    //* Comercio con la banca hacia el objetivo, a la mejor tasa (puertos incluidos)
+    //* Comercio con la banca hacia el objetivo, a la mejor tasa (puertos incluidos).
+    //* Solo el nivel dificil comercia con la banca.
+    if (dificultad !== "dificil") return false;
     const intercambio = elegirIntercambioBanca(
       jugador, objetivo.costo,
       (recurso) => obtenerTasaDeComercio(id, this.tablero.vertices, this.tablero.puertos, recurso),
@@ -1855,6 +1887,7 @@ export class CatanRoom extends Room {
       if (this.partida.reemplazarConBots && jugador && !jugador.esBot) {
         this.broadcast("log", { jugador: "Sistema: ", mensaje: jugador.nombre + " abandonó la partida: un bot ocupa su lugar" });
         jugador.esBot = true;
+        jugador.dificultadBot = DIFICULTAD_POR_DEFECTO;
         jugador.nombre = "Bot " + jugador.nombre;
         this.responderOfertaBot(client.sessionId);
         return;
